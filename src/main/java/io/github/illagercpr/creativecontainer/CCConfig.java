@@ -11,6 +11,7 @@ public final class CCConfig {
     public static final ModConfigSpec SPEC;
     public static final ModConfigSpec.IntValue DEFAULT_REPORTED_AMOUNT;
     public static final ModConfigSpec.BooleanValue ACCEPT_INSERTIONS;
+    public static final ModConfigSpec.IntValue POOL_SLOTS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -26,6 +27,11 @@ public final class CCConfig {
                 .comment("Whether the container accepts items pushed into it. The creative pool never stores anything,",
                         "so insertions are rejected by default (the safe behaviour for an infinite source).")
                 .define("acceptInsertions", false);
+
+        POOL_SLOTS = builder
+                .comment("How many item slots the pool of every container offers (9 .. 4320).",
+                        "Existing containers keep the larger size they were saved with, even if this value is lowered.")
+                .defineInRange("poolSlots", 108, 9, 4320);
 
         builder.pop();
         SPEC = builder.build();

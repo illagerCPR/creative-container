@@ -1,9 +1,11 @@
 package io.github.illagercpr.creativecontainer.registry;
 
 import io.github.illagercpr.creativecontainer.CreativeContainer;
+import io.github.illagercpr.creativecontainer.block.CreativeContainerBlockEntity;
 import io.github.illagercpr.creativecontainer.menu.CreativeContainerMenu;
 import io.github.illagercpr.creativecontainer.network.AddToPoolPayload;
 import io.github.illagercpr.creativecontainer.network.PickItemPayload;
+import io.github.illagercpr.creativecontainer.network.PoolDeltaPayload;
 import io.github.illagercpr.creativecontainer.network.PoolEditPayload;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -43,6 +45,16 @@ public final class CCPayloads {
                 menu.handleAddToPool(payload.stack());
             }
         });
+
+        // Server -> client: incremental pool updates for the client-side mirror. Applied on the main thread; with no
+        // real client tracking the chunk (headless GameTests) the server never sends anything.
+        registrar.playToClient(PoolDeltaPayload.TYPE, PoolDeltaPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player().level().getBlockEntity(payload.pos())
+                            instanceof CreativeContainerBlockEntity container) {
+                        container.applyClientDelta(payload);
+                    }
+                }));
 
         CreativeContainer.LOGGER.debug("Registered creative container payloads");
     }

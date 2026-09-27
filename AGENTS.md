@@ -6,7 +6,7 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 ## 当前状态（2026-09-27）
 
-M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动）/ M4（资源与数据）已完成实现；M5 自动化验证完成——GameTest **26 项全绿**：dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）。剩余见 `docs/02` 的「已知待办」：`runClient` 人工验收、首个 tag 与 Release。
+M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动）/ M4（资源与数据）已完成实现；M5 自动化验证完成——GameTest **30 项全绿**：dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）。剩余见 `docs/02` 的「已知待办」：`runClient` 人工验收、首个 tag 与 Release。
 
 改设计先改 `docs/` 再动代码；需求权威来源是 `docs/00`。
 
@@ -35,6 +35,12 @@ M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动
 - **EMC 计算时机（2026-09-27 实机验证纠错）**：EMC 在两条路径重算——① `PECore#addReloadListeners` 注册的**数据包加载阶段**监听器（专用服务器在线程启动前加载资源，这次计算**早于一切服务器事件**，`ServerAboutToStartEvent` 写入必然赶不上它）；② `PECore#dataPackSync` ← `OnDatapackSyncEvent`（`/reload` 及**每个玩家加入**）。所以生产环境首启后玩家一加入即生效；`ServerStartedEvent` 回读不一致时，本模组自行 post `OnDatapackSyncEvent(playerList, null)`（与 `/reload` 群发路径相同）触发重算实现自愈，无玩家场景也立即生效。
 - **dev 引入真实 ProjectE**：cursemaven（`maven { url 'https://cursemaven.com' }` + `runtimeOnly 'curse.maven:projecte-226410:6611984'`，1.21.1-PE1.1.0，**MIT**，依赖仅 minecraft+neoforge）。仅 dev 运行时，不编译、不打包。本机 **forgecdn 直连（mediafilez.forgecdn.net）不可达**（连接超时），必须走 cursemaven。ProjectE 的 UUID Checker/VersionChecker 遥测线程在本机会因反代 MITM 报 SSL 错误——自身已捕获，无害，grep 日志时排除。
 - ProjectE 是 CurseForge 独占（无 Maven 制品、GitHub 无 release jar）→ 本模组对它的所有调用走**反射**，不引入编译期依赖。projecte modid = `projecte`，Project Expansion = `projectexpansion`。
+
+### 核心池实现（勿凭旧印象改）
+
+- **池容量是配置项**：`CCConfig.POOL_SLOTS`（默认 108，范围 9–4320）。`CreativeItemPool` 的 filled 槽始终是连续前缀 `[0, filledSlots)`；读档时有效容量 = `max(配置, 已存条目数)`（配置调小不影响已存档容器）。
+- **查找走哈希索引**：`item -> 槽位下标列表`（`CreativeItemPool.byItem`）只用于缩小候选，最终相等判断仍是 `isSameItemSameComponents`——组件变体（两把不同附魔剑）因此天然共存；不要把最终判断改成 `equals`/HashMap 语义。
+- **客户端镜像走增量 payload**：`PoolDeltaPayload`（server→client，`sendToPlayersTrackingChunk`，GameTest 无跟踪玩家即 no-op）。加物品=单槽 delta、改 N=仅数量、移除（触发压缩）=clearFirst 全量重排。chunk 加载仍走原版 getUpdateTag 全量快照。**不要**改回 `sendBlockUpdated` 整包推送（4320 槽时一次改动≈MB 级包）。
 
 ### 1.21.1 / NeoForge 21.1.248 API
 

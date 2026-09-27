@@ -212,7 +212,7 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
         CreativeContainerBlockEntity container = menu.blockEntity();
         int filled = container == null ? 0 : container.pool().availableItems().size();
-        graphics.drawString(font, Component.translatable("gui.creativecontainer.pool", filled, CreativeItemPool.SLOT_COUNT),
+        graphics.drawString(font, Component.translatable("gui.creativecontainer.pool", filled, poolSlotCount()),
                 POOL_LEFT, POOL_HEADER_Y, 0x404040, false);
         // Right of the amount box: the slot above it belongs to the pool header, so a label there would overlap.
         graphics.drawString(font, Component.translatable("gui.creativecontainer.amount.label"),
@@ -230,8 +230,14 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
         return (page + 1) + " / " + totalPages + "   (" + filtered.size() + ")";
     }
 
-    private static int poolPageCount() {
-        return CreativeContainerLayout.poolPageCount(CreativeItemPool.SLOT_COUNT);
+    private static int poolSlotCount() {
+        return CreativeItemPool.DEFAULT_SLOT_COUNT;
+    }
+
+    private int poolPageCount() {
+        CreativeContainerBlockEntity container = menu.blockEntity();
+        int slots = container == null ? CreativeItemPool.DEFAULT_SLOT_COUNT : container.pool().slotCount();
+        return CreativeContainerLayout.poolPageCount(slots);
     }
 
     @Override

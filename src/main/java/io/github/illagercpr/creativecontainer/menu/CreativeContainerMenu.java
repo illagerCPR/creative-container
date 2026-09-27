@@ -159,7 +159,7 @@ public class CreativeContainerMenu extends AbstractContainerMenu {
     }
 
     public void handleRemoveSlot(int slot) {
-        if (blockEntity != null && slot >= 0 && slot < CreativeItemPool.SLOT_COUNT) {
+        if (blockEntity != null && slot >= 0 && slot < blockEntity.pool().slotCount()) {
             blockEntity.removeSlot(slot);
         }
     }

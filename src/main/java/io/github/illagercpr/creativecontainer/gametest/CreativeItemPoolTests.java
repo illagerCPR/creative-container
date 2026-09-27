@@ -102,8 +102,8 @@ public final class CreativeItemPoolTests {
     }
 
     @GameTest(template = SMOKE)
-    public static void poolHasFiftyFourSlots(GameTestHelper helper) {
-        CreativeItemPool pool = new CreativeItemPool();
+    public static void poolFillsToItsSlotCount(GameTestHelper helper) {
+        CreativeItemPool pool = new CreativeItemPool(9); // small on purpose: fills quickly
         int inserted = 0;
         for (Item item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
             if (item == Items.AIR) {
@@ -112,11 +112,11 @@ public final class CreativeItemPoolTests {
             if (pool.addItem(new ItemStack(item))) {
                 inserted++;
             }
-            if (inserted == CreativeItemPool.SLOT_COUNT) {
+            if (inserted == pool.slotCount()) {
                 break;
             }
         }
-        checkEquals(CreativeItemPool.SLOT_COUNT, inserted, "a full pool holds exactly 54 distinct items");
+        checkEquals(pool.slotCount(), inserted, "a full pool holds exactly slotCount distinct items");
 
         for (Item item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
             if (item == Items.AIR || pool.contains(new ItemStack(item))) {
@@ -125,6 +125,41 @@ public final class CreativeItemPoolTests {
             check(!pool.addItem(new ItemStack(item)), "a full pool refuses further items");
             break;
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = SMOKE)
+    public static void slotCountIsClampedToConfiguredBounds(GameTestHelper helper) {
+        checkEquals(CreativeItemPool.MIN_SLOT_COUNT, new CreativeItemPool(0).slotCount(),
+                "below the minimum clamps up");
+        checkEquals(CreativeItemPool.MIN_SLOT_COUNT, new CreativeItemPool(-50).slotCount(),
+                "negative sizes clamp up as well");
+        checkEquals(CreativeItemPool.MAX_SLOT_COUNT, new CreativeItemPool(100_000).slotCount(),
+                "above the maximum clamps down");
+        checkEquals(CreativeItemPool.DEFAULT_SLOT_COUNT, new CreativeItemPool().slotCount(),
+                "the default is the configured default");
+        checkEquals(4320, CreativeItemPool.MAX_SLOT_COUNT, "the configured upper bound");
+        helper.succeed();
+    }
+
+    @GameTest(template = SMOKE)
+    public static void lookupIndexStaysCoherentAfterRemovals(GameTestHelper helper) {
+        CreativeItemPool pool = new CreativeItemPool(27);
+        pool.addItem(new ItemStack(Items.DIAMOND));
+        pool.addItem(new ItemStack(Items.EMERALD));
+        pool.addItem(new ItemStack(Items.GOLD_INGOT));
+        check(pool.removeSlot(0), "removing the first slot compacts the pool");
+        check(!pool.contains(new ItemStack(Items.DIAMOND)), "a removed item must leave the lookup index");
+        check(pool.contains(new ItemStack(Items.EMERALD)), "kept items stay reachable");
+        check(pool.contains(new ItemStack(Items.GOLD_INGOT)), "kept items stay reachable after compaction");
+
+        // Same item type with different components: two distinct pool entries, both findable through the index.
+        ItemStack glinted = new ItemStack(Items.DIAMOND_SWORD);
+        glinted.set(net.minecraft.core.component.DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+        check(pool.addItem(glinted), "the component variant takes a slot");
+        check(pool.addItem(new ItemStack(Items.DIAMOND_SWORD)), "the plain variant takes another slot");
+        check(pool.contains(glinted), "the index distinguishes component variants (glinted)");
+        check(pool.contains(new ItemStack(Items.DIAMOND_SWORD)), "the index distinguishes component variants (plain)");
         helper.succeed();
     }
 }

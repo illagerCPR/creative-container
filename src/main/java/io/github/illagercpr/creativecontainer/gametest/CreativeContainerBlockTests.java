@@ -3,14 +3,17 @@ package io.github.illagercpr.creativecontainer.gametest;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.SMOKE;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.check;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.checkEquals;
+import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.checkSameStack;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.makeMockServerPlayer;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.placeContainer;
 
+import io.github.illagercpr.creativecontainer.CCConfig;
 import io.github.illagercpr.creativecontainer.CreativeContainer;
 import io.github.illagercpr.creativecontainer.block.CreativeContainerBlockEntity;
 import io.github.illagercpr.creativecontainer.container.CreativeItemPool;
 import io.github.illagercpr.creativecontainer.container.CreativePoolItemHandler;
 import io.github.illagercpr.creativecontainer.menu.CreativeContainerMenu;
+import io.github.illagercpr.creativecontainer.network.PoolDeltaPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -37,6 +40,8 @@ public final class CreativeContainerBlockTests {
         CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
         check(container != null, "the block must expose its block entity");
         checkEquals(CreativeItemPool.MAX_AMOUNT, container.reportedAmount(), "a new container reports the maximum");
+        checkEquals((long) CCConfig.POOL_SLOTS.get().intValue(), (long) container.pool().slotCount(),
+                "a new container honours the configured slot count");
         check(container.availableItems().isEmpty(), "a new container is empty");
         helper.succeed();
     }
@@ -113,6 +118,46 @@ public final class CreativeContainerBlockTests {
         client.loadWithComponents(updateTag, helper.getLevel().registryAccess());
         checkEquals(99, client.reportedAmount(), "the mirrored container sees the amount");
         check(client.pool().contains(new ItemStack(Items.DIAMOND)), "the mirrored container sees the pool");
+        helper.succeed();
+    }
+
+    /**
+     * In-game changes travel as incremental {@link PoolDeltaPayload}s instead of full block-entity snapshots. The
+     * mirror must apply all three delta shapes: a single added slot, an amount-only change and a full ordered resync
+     * (after a compaction).
+     */
+    @GameTest(template = SMOKE)
+    public static void clientMirrorAppliesDeltas(GameTestHelper helper) {
+        CreativeContainerBlockEntity server = placeContainer(helper, 1, 1, 1);
+        server.addItem(new ItemStack(Items.DIAMOND));
+        server.setReportedAmount(77);
+
+        CreativeContainerBlockEntity mirror = new CreativeContainerBlockEntity(
+                server.getBlockPos(), server.getBlockState());
+        mirror.loadWithComponents(server.getUpdateTag(helper.getLevel().registryAccess()),
+                helper.getLevel().registryAccess());
+        check(mirror.pool().contains(new ItemStack(Items.DIAMOND)), "the mirror starts from the full snapshot");
+        checkEquals(77, mirror.reportedAmount(), "the snapshot carries the amount");
+
+        // amount-only delta
+        mirror.applyClientDelta(PoolDeltaPayload.amount(server.getBlockPos(), 123));
+        checkEquals(123, mirror.reportedAmount(), "an amount-only delta updates the mirror");
+        check(mirror.pool().contains(new ItemStack(Items.DIAMOND)), "an amount-only delta keeps the contents");
+
+        // single-slot delta
+        server.addItem(new ItemStack(Items.EMERALD));
+        mirror.applyClientDelta(PoolDeltaPayload.slot(server.getBlockPos(), 123, server.pool().filledSlots() - 1,
+                new ItemStack(Items.EMERALD)));
+        check(mirror.pool().contains(new ItemStack(Items.EMERALD)), "a slot delta lands in the mirror");
+        check(mirror.pool().contains(new ItemStack(Items.DIAMOND)), "a slot delta keeps the other entries");
+
+        // full resync after a removal compacted the server pool
+        server.removeSlot(0);
+        mirror.applyClientDelta(PoolDeltaPayload.fullResync(server.getBlockPos(), 123, server.pool().availableItems()));
+        check(!mirror.pool().contains(new ItemStack(Items.DIAMOND)), "the resync wipes removed entries");
+        checkSameStack(server.pool().availableItems().get(0), mirror.pool().availableItems().get(0),
+                "the resync rebuilds the mirror in server order");
+        checkEquals(server.pool().slotCount(), mirror.pool().slotCount(), "the resync keeps the size");
         helper.succeed();
     }
 

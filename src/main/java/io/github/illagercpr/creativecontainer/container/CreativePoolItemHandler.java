@@ -29,7 +29,7 @@ public final class CreativePoolItemHandler implements IItemHandler {
 
     @Override
     public int getSlots() {
-        return CreativeItemPool.SLOT_COUNT;
+        return pool.slotCount();
     }
 
     @Override
