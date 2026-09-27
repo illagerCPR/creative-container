@@ -6,7 +6,7 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 ## 当前状态（2026-09-27）
 
-M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动）/ M4（资源与数据）已完成实现；M5 自动化验证完成——GameTest **30 项全绿**：dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）。剩余见 `docs/02` 的「已知待办」：`runClient` 人工验收、首个 tag 与 Release。
+**已发布 `v0.1.0`**（2026-09-27，GitHub Release 附产物 jar）。M0–M5 全部完成：GameTest **30 项全绿**——dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）；`runClient` 人工验收通过（三轮截图反馈全部修复）。后续功能见 `docs/02` 的「已知待办」。
 
 改设计先改 `docs/` 再动代码；需求权威来源是 `docs/00`。
 
