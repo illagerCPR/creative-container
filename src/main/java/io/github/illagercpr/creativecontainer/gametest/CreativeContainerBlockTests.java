@@ -41,6 +41,20 @@ public final class CreativeContainerBlockTests {
         helper.succeed();
     }
 
+    /**
+     * BaseEntityBlock defaults to {@code RenderShape.INVISIBLE}, which leaves a placed container invisible (t1 bug
+     * report): only the selection outline shows while the item form renders fine. The block must keep requesting its
+     * chunk-baked model.
+     */
+    @GameTest(template = SMOKE)
+    public static void placedBlockRendersItsModel(GameTestHelper helper) {
+        placeContainer(helper, 1, 1, 1);
+        checkEquals(net.minecraft.world.level.block.RenderShape.MODEL,
+                helper.getBlockState(new BlockPos(1, 1, 1)).getRenderShape(),
+                "a placed container must render its block model");
+        helper.succeed();
+    }
+
     @GameTest(template = SMOKE)
     public static void itemHandlerRefusesUnnamedExtraction(GameTestHelper helper) {
         CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);

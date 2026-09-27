@@ -39,7 +39,10 @@ M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动
 ### 1.21.1 / NeoForge 21.1.248 API
 
 - `Slot.x` / `Slot.y` 是 **`public final`**：槽位坐标只能在构造时给 → 布局常量集中在 `menu.CreativeContainerLayout`，Menu 决定槽位坐标、Screen 只画背景。
-- `Block#getRenderShape`、`Block#getCloneItemStack(LevelReader, ...)` 已过时且默认行为即所需 → **不要重写**（项目开了 `-Xlint:deprecation`，警告即噪声）。
+- **`BaseEntityBlock.getRenderShape` 默认 `RenderShape.INVISIBLE`**（它假设 BE 用渲染器画自己）——普通方块模型的 `BaseEntityBlock` 子类**必须**覆写 `getRenderShape(BlockState)` 返回 `MODEL`，否则放置后整个方块不可见（只剩选中框，物品形态却正常渲染）。该 1 参签名上游标了 `@Deprecated`，但覆写不产生 lint 警告、也无替代。有 GameTest 守卫（`placedBlockRendersItsModel`）。
+- `Block#getCloneItemStack(LevelReader, ...)` 已过时且默认行为即所需 → 不要重写。
+- **`GuiGraphics.blit` 的短重载按 256×256 纹理采样**：非 256 尺寸贴图必须用 `(x, y, float u, float v, w, h, texW, texH)` 重载并传真实尺寸，否则 396×222 的背景被水平平铺 1.55 倍、18×18 的槽位贴图被涂抹成单像素色块（t2 截图实锤）。
+- **`AbstractContainerScreen.mouseClicked` 所有路径都返回 true**（含「点在界面外」的收尾 return）：自定义点击区域必须**先于** `super.mouseClicked` 处理，否则永远收不到点击（表象：界面上的自定义按钮/网格点了没反应，GameTest 直测菜单逻辑却全绿）。
 - 方块提示签名：`appendHoverText(ItemStack, Item.TooltipContext, List<Component>, TooltipFlag)`（`TooltipContext` 是 `Item` 的内部类）。
 - 自定义容器 GUI：`IMenuTypeExtension.create(IContainerFactory)`；`openMenu(provider, pos)` 自动写 BlockPos；客户端 Screen 用 mod bus `RegisterMenuScreensEvent`；`AbstractContainerMenu` 没有 `getTitle()`。
 - `@EventBusSubscriber` 的 `bus` 属性已废弃 → 客户端监听写在主类构造器的 `FMLEnvironment.dist == Dist.CLIENT` 守卫里（`CCClient.register(modEventBus)`），dedicated server 不加载客户端类。

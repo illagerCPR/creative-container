@@ -124,7 +124,9 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.blit(BACKGROUND, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+        // The texture size must be passed explicitly: the short overloads sample in a 256x256 space, which tiles
+        // (background, 396x222) or smears to a single pixel (slots, 18x18) instead of drawing the image.
+        graphics.blit(BACKGROUND, leftPos, topPos, 0.0F, 0.0F, imageWidth, imageHeight, imageWidth, imageHeight);
 
         drawCells(graphics, GRID_LEFT, GRID_TOP, COLUMNS, ROWS);
         drawCells(graphics, POOL_LEFT, POOL_TOP, POOL_COLUMNS, POOL_ROWS);
@@ -137,7 +139,8 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
     private void drawCells(GuiGraphics graphics, int gridLeft, int gridTop, int columns, int rows) {
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
-                graphics.blit(SLOT, leftPos + gridLeft + col * CELL, topPos + gridTop + row * CELL, 0, 0, CELL, CELL);
+                graphics.blit(SLOT, leftPos + gridLeft + col * CELL, topPos + gridTop + row * CELL,
+                        0.0F, 0.0F, CELL, CELL, CELL, CELL);
             }
         }
     }
@@ -211,8 +214,9 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
         int filled = container == null ? 0 : container.pool().availableItems().size();
         graphics.drawString(font, Component.translatable("gui.creativecontainer.pool", filled, CreativeItemPool.SLOT_COUNT),
                 POOL_LEFT, POOL_HEADER_Y, 0x404040, false);
+        // Right of the amount box: the slot above it belongs to the pool header, so a label there would overlap.
         graphics.drawString(font, Component.translatable("gui.creativecontainer.amount.label"),
-                POOL_LEFT, AMOUNT_TOP - 10, 0x404040, false);
+                POOL_LEFT + AMOUNT_WIDTH + 4, AMOUNT_TOP + 2, 0x404040, false);
 
         graphics.drawString(font, pageLabel(), GRID_LEFT, GRID_TOP + ROWS * CELL + 4, 0x606060, false);
 
@@ -274,10 +278,13 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) {
+        // AbstractContainerScreen.mouseClicked handles the whole screen and returns true on every path (it also owns
+        // the "clicked outside" behaviour), so the browser and pool regions must be handled BEFORE calling super —
+        // after super they would never be reached.
+        if (handleBrowserClick(mouseX, mouseY, button) || handlePoolClick(mouseX, mouseY, button)) {
             return true;
         }
-        return handleBrowserClick(mouseX, mouseY, button) || handlePoolClick(mouseX, mouseY, button);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean handleBrowserClick(double mouseX, double mouseY, int button) {

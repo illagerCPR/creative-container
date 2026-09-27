@@ -39,6 +39,17 @@ public class CreativeContainerBlock extends BaseEntityBlock {
         return CODEC;
     }
 
+    // BaseEntityBlock defaults to RenderShape.INVISIBLE because it assumes a block entity renderer draws the block.
+    // This block is a plain chunk-baked model, so the model must be requested explicitly — without this override the
+    // placed block renders nothing at all (only its selection outline), while the item form still renders. The 1-arg
+    // signature is what 1.21.1 has; upstream marks it @Deprecated (which makes javac warn on the override even though
+    // there is no replacement), so the warning is suppressed deliberately.
+    @SuppressWarnings("deprecation")
+    @Override
+    public net.minecraft.world.level.block.RenderShape getRenderShape(BlockState state) {
+        return net.minecraft.world.level.block.RenderShape.MODEL;
+    }
+
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
