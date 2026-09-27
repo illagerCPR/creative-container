@@ -60,6 +60,32 @@ final class CreativeContainerTestSupport {
         return helper.getBlockEntity(new BlockPos(x, y, z));
     }
 
+    /**
+     * A mock server player that co-installed mods cannot break.
+     *
+     * <p>{@link GameTestHelper#makeMockServerPlayerInLevel()} runs the full player-list login, and NeoForge fires
+     * {@code OnDatapackSyncEvent} for the joining player early in that process — before the player is registered
+     * anywhere. A co-installed mod that pushes its own payload at the mock's vanilla connection (ProjectE syncs its
+     * world transmutations on that event) makes NeoForge throw {@link UnsupportedOperationException}, which aborts the
+     * login mid-way: neither swallowing the exception nor recovering the player afterwards is possible. The mock is
+     * therefore wired up by hand, exactly like the vanilla helper but without the login: a pure in-memory player is all
+     * a GameTest needs (no client ever sees it, and nothing ever listens on the embedded connection).
+     */
+    static net.minecraft.server.level.ServerPlayer makeMockServerPlayer(GameTestHelper helper) {
+        net.minecraft.server.level.ServerLevel level = helper.getLevel();
+        com.mojang.authlib.GameProfile profile =
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "test-mock-player");
+        net.minecraft.server.level.ServerPlayer player = new net.minecraft.server.level.ServerPlayer(
+                level.getServer(), level, profile, net.minecraft.server.level.ClientInformation.createDefault());
+        net.minecraft.network.Connection connection =
+                new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
+        new io.netty.channel.embedded.EmbeddedChannel(connection);
+        player.connection = new net.minecraft.server.network.ServerGamePacketListenerImpl(
+                level.getServer(), connection, player,
+                net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false));
+        return player;
+    }
+
     static void log(String message) {
         CreativeContainer.LOGGER.info("[gametest] {}", message);
     }

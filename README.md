@@ -16,7 +16,7 @@
 | --- | --- |
 | 打开 GUI | 空手右键方块（创造式界面：左侧搜索 + 分页物品网格；右侧玩家背包 + 容器池） |
 | 从创造池取物 | 左键取 1 个，Shift + 左键取一整组 |
-| 把物品放进容器池 | 左键**右键**创造网格里的物品（右键 = 加入容器池，最多 54 种） |
+| 把物品放进容器池 | 右键创造网格里的物品（右键 = 加入容器池，最多 54 种） |
 | 从容器池取物 | 左键池中物品取 1 个，Shift + 左键取一组 |
 | 移出容器池 | 右键池中物品 |
 | 报告数量 N | GUI 右侧「报告数量」输入框，范围 **1 – 2147483647**，回车或关界面生效 |
@@ -36,7 +36,7 @@
 | 仅 ProjectE | **999,999,999,999,999,999** |
 | ProjectE + Project Expansion | **9,223,372,036,854,775,807**（`Long.MAX_VALUE`） |
 
-Project Expansion 环境下**无法**写入需求里的 `9999999999999999999999`（≈1.0×10²²）：ProjectE 的物品 EMC 是 `long`，Project Expansion 的 BigInteger 只覆盖 EMC *存储*（EMC 链接/继电器/收集器）与玩家知识库，其 `/emc set` 参数仍是 long。为避免静默溢出成负数，本模组在该环境下写入 long 上限并在日志中说明。证据见 `docs/01`。
+ProjectE 的物品 EMC 是 64 位 `long`：Project Expansion 的 BigInteger 只覆盖 EMC *存储*（EMC 链接/继电器/收集器）与玩家知识库，物品 EMC 参数仍是 `long`。因此同时安装 Project Expansion 时，本模组写入表中的 `Long.MAX_VALUE`。技术证据见 `docs/01`。
 
 EMC 值由本模组自动写入 ProjectE 的自定义 EMC（`config/ProjectE/custom_emc.json`，与 `/projecte setemc` 同一条路径），因此**首次启动即生效**，且 `/reload`、重启后依然保留。
 

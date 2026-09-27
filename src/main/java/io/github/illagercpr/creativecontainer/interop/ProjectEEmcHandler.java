@@ -5,6 +5,7 @@ import io.github.illagercpr.creativecontainer.interop.projecte.ProjectEEmcBridge
 import io.github.illagercpr.creativecontainer.registry.CCItems;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -12,10 +13,13 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 /**
  * Drives the ProjectE EMC integration.
  *
- * <p>ProjectE computes its EMC values on data pack sync ({@link OnDatapackSyncEvent}, which also fires once at server
- * start). Writing our entry before that computation — during {@link ServerAboutToStartEvent} — means the value is in
- * place for the very first computation, with no extra reload. The write is idempotent, so it is repeated on every sync
- * as a cheap safety net.
+ * <p>The entry is written during {@link ServerAboutToStartEvent} through the very same code path ProjectE's own
+ * {@code /projecte setemc} command uses. ProjectE computes its EMC mapping while loading data packs — which happens
+ * <em>before</em> any server lifecycle event — so the very first computation of a server start cannot see the write.
+ * In normal play this never matters (ProjectE recomputes on every data pack sync, including each player joining), but
+ * the handler also self-heals: after the server started it reads the value back and, on mismatch, re-posts the same
+ * data-pack-sync event {@code /reload} uses so the mapping contains the value immediately — even on a headless server
+ * that no player ever joins. The write is idempotent and repeated on every sync as a safety net.
  */
 public final class ProjectEEmcHandler {
 
@@ -49,13 +53,31 @@ public final class ProjectEEmcHandler {
         if (!InteropHooks.projectEAvailable()) {
             return;
         }
-        long reported = ProjectEEmcBridge.queryValue(new ItemStack(CCItems.CREATIVE_CONTAINER.get()));
+        MinecraftServer server = event.getServer();
         long expected = ProjectEEmcBridge.targetValue();
+        long reported = ProjectEEmcBridge.queryValue(new ItemStack(CCItems.CREATIVE_CONTAINER.get()));
         if (reported == expected) {
             CreativeContainer.LOGGER.info("ProjectE reports {} EMC for the creative container.", reported);
-        } else if (applied) {
-            CreativeContainer.LOGGER.warn("ProjectE currently reports {} EMC for the creative container, expected {}. "
-                    + "Run /reload once to recompute EMC values.", reported, expected);
+            return;
+        }
+        if (!applied) {
+            CreativeContainer.LOGGER.warn("ProjectE reports {} EMC for the creative container, expected {}; the "
+                    + "custom EMC entry could not be written. Run /reload once to recompute EMC values.",
+                    reported, expected);
+            return;
+        }
+        // ProjectE computed its mapping while loading data packs, which happens before any server event — the first
+        // computation of this start could not see our write yet. Re-post the data pack sync (/reload's broadcast of
+        // it, i.e. with no player) so every listener recomputes with the entry in place.
+        CreativeContainer.LOGGER.info("ProjectE computed EMC before the custom entry was written (it reported {}); "
+                + "triggering a data pack sync to recompute.", reported);
+        NeoForge.EVENT_BUS.post(new OnDatapackSyncEvent(server.getPlayerList(), null));
+        long healed = ProjectEEmcBridge.queryValue(new ItemStack(CCItems.CREATIVE_CONTAINER.get()));
+        if (healed == expected) {
+            CreativeContainer.LOGGER.info("ProjectE now reports {} EMC for the creative container.", healed);
+        } else {
+            CreativeContainer.LOGGER.warn("ProjectE still reports {} EMC for the creative container, expected {}. "
+                    + "Run /reload once to recompute EMC values.", healed, expected);
         }
     }
 }

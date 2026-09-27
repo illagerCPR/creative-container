@@ -6,7 +6,7 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 ## 当前状态（2026-09-27）
 
-M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动）/ M4（资源与数据）已完成实现；GameTest 23 项（含 AE2 联动 4 项，dev 运行真实加载 AE2 执行）。待办见 `docs/02` 的「已知待办」：真实 ME 网络端到端、带 ProjectE 的实机 EMC 验证、`runClient` 观感验收。
+M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动）/ M4（资源与数据）已完成实现；M5 自动化验证完成——GameTest **26 项全绿**：dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）。剩余见 `docs/02` 的「已知待办」：`runClient` 人工验收、首个 tag 与 Release。
 
 改设计先改 `docs/` 再动代码；需求权威来源是 `docs/00`。
 
@@ -25,12 +25,15 @@ M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动
 
 - **ME 存储总线读取的是相邻方块的 `AECapabilities.ME_STORAGE`**：`StorageBusPart` 的邻接查询就是 `new PartAdjacentApi<>(this, AECapabilities.ME_STORAGE)`（javap -c 实证）。因此本模组**只注册该方块能力**，不需要网格节点/频道/供电。若日后有人想「改成节点方案」，先读 `docs/01`。
 - 只 import `appeng.api.**`；AE2 制品在 **Maven Central**（`org.appliedenergistics:appliedenergistics2:19.2.17`，唯一传递依赖 guideme）。本模组用 **`compileOnly` + `runtimeOnly`**（dev 跑真实 AE2），发布产物**不含** AE2 依赖声明。
-- **未装 AE2 时不能让 JVM 碰到 `appeng.**`**：所有 AE2 类型集中在 `registry.Ae2CapabilityRegistration`、`interop.ae2.*`、`gametest.Ae2TestSupport`，只在 `InteropHooks.ae2Available()` 为真时被加载（GameTest 类本身不含 AE2 类型，缺 AE2 时日志跳过）。
+- **未装 AE2 时不能让 JVM 碰到 `appeng.**`**：所有 AE2 类型集中在 `registry.Ae2CapabilityRegistration`、`interop.ae2.*`、`gametest.Ae2TestSupport`、`gametest.Ae2NetworkTestSupport`，只在 `InteropHooks.ae2Available()` 为真时被加载（GameTest 类本身不含 AE2 类型，缺 AE2 时日志跳过）。
+- **真实网络端到端的搭法**（`Ae2NetworkTestSupport`，AE2 自家 testplots 同款）：`appeng.api.parts.PartHelper.setPart(level, pos, side, player, item)` 可编程放置部件并自动创建线缆总线宿主；线缆也是部件（`AEParts.GLASS_CABLE.item(AEColor.TRANSPARENT)` 放在任意面即成为中心线缆）；能源用 `AEBlocks.CREATIVE_ENERGY_CELL`（无需控制器，ad-hoc 网络通道预算 8）；导出总线 `getConfig().addFilter(ItemLike)` 设置过滤。
 
 ### ProjectE / Project Expansion
 
 - 物品 EMC 是 **`long`**（`EMCMappingHandler` 的 `Object2LongMap<ItemInfo>`，`@Range(0, Long.MAX_VALUE)`；自定义 EMC 文件用 `nonNegativeLong()`）。Project Expansion 的 **`SetEmcCMDMixin` 只改提示文案**，`SetEmcCMD` 参数仍是 `LongArgumentType.longArg(0, Long.MAX_VALUE)`；其 BigInteger 只用于 EMC 存储（`IEmcStorageBigInteger`）与玩家知识库。**结论：1.0×10²² 无法落地**，装 Project Expansion 时写 `Long.MAX_VALUE`。
-- 写入路径与 `/projecte setemc` 同源：`CustomEMCParser.init(registries)` → `addToFile(NSSItem, long)` → `flush(registries)`（`init` 内部会先 `flush` 再读文件，所以必须按这个顺序调）。EMC 在**每次数据包同步**时重算（`PECore#dataPackSync` ← `OnDatapackSyncEvent`），所以在 `ServerAboutToStartEvent` 写入即可让首次计算包含本物品，**无需额外 reload**。
+- 写入路径与 `/projecte setemc` 同源：`CustomEMCParser.init(registries)` → `addToFile(NSSItem, long)` → `flush(registries)`（`init` 内部会先 `flush` 再读文件，所以必须按这个顺序调）。
+- **EMC 计算时机（2026-09-27 实机验证纠错）**：EMC 在两条路径重算——① `PECore#addReloadListeners` 注册的**数据包加载阶段**监听器（专用服务器在线程启动前加载资源，这次计算**早于一切服务器事件**，`ServerAboutToStartEvent` 写入必然赶不上它）；② `PECore#dataPackSync` ← `OnDatapackSyncEvent`（`/reload` 及**每个玩家加入**）。所以生产环境首启后玩家一加入即生效；`ServerStartedEvent` 回读不一致时，本模组自行 post `OnDatapackSyncEvent(playerList, null)`（与 `/reload` 群发路径相同）触发重算实现自愈，无玩家场景也立即生效。
+- **dev 引入真实 ProjectE**：cursemaven（`maven { url 'https://cursemaven.com' }` + `runtimeOnly 'curse.maven:projecte-226410:6611984'`，1.21.1-PE1.1.0，**MIT**，依赖仅 minecraft+neoforge）。仅 dev 运行时，不编译、不打包。本机 **forgecdn 直连（mediafilez.forgecdn.net）不可达**（连接超时），必须走 cursemaven。ProjectE 的 UUID Checker/VersionChecker 遥测线程在本机会因反代 MITM 报 SSL 错误——自身已捕获，无害，grep 日志时排除。
 - ProjectE 是 CurseForge 独占（无 Maven 制品、GitHub 无 release jar）→ 本模组对它的所有调用走**反射**，不引入编译期依赖。projecte modid = `projecte`，Project Expansion = `projectexpansion`。
 
 ### 1.21.1 / NeoForge 21.1.248 API
@@ -47,8 +50,9 @@ M0（骨架）/ M1（核心池机制）/ M2（GUI）/ M3（AE2 + ProjectE 联动
 ### GameTest 纪律
 
 - `helper.setBlock/getBlockEntity` 收**结构局部坐标**；`helper.getLevel()` 上的世界坐标查询要用 `helper.absolutePos(local)`（混用表象是「刚 setBlock 却读到空气」，且不报错）。
-- `makeMockServerPlayerInLevel()`（已过时但无替代）生成在**世界出生点**：任何距离/`stillValid` 检查前必须 `teleportTo(level, absX+0.5, absY+1, absZ+0.5, 0, 0)`。
+- `makeMockServerPlayerInLevel()`（已过时）生成在**世界出生点**：任何距离/`stillValid` 检查前必须 `teleportTo(level, absX+0.5, absY+1, absZ+0.5, 0, 0)`。
 - GameTest mock 玩家是 vanilla 连接：**不要**给 mock 玩家发 mod payload（会抛 `UnsupportedOperationException`）。
+- **装了 ProjectE 后 `makeMockServerPlayerInLevel()` 不可用**：ProjectE 在 `OnDatapackSyncEvent` 向加入的玩家推 `sync_world_transmutations`，而该事件在 `placeNewPlayer` 字节码偏移 470 触发、早于玩家注册（689/731/1006）——异常中止登录，玩家不存在，catch 后恢复也无效。正解（`CreativeContainerTestSupport.makeMockServerPlayer`）：手工构造——`new ServerPlayer(server, level, profile, ClientInformation.createDefault())` + 裸 `Connection(SERVERBOUND)` 塞进 `EmbeddedChannel` + `new ServerGamePacketListenerImpl(server, connection, player, CommonListenerCookie.createInitial(profile, false))`，全程不走登录。**不需要连接的场合（如 `PartHelper.setPart` 的 player 参数）用 `FakePlayerFactory.getMinecraft(level)` 更干净**（AE2 testplots 同款）。
 - 全绿 ≠ 无异常：跑完必须 grep 日志的 `ERROR`/`exception`。
 - 新增测试需要模板：`python3 tools/make_empty_structure.py` 生成 `smoke`(3³) 与 `interop`(7×5×7)。
 

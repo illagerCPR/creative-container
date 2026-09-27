@@ -51,6 +51,9 @@ neoForge {
 
 repositories {
     mavenCentral()
+    // Dev-only optional interop: ProjectE publishes no Maven artefact (CurseForge exclusive); cursemaven
+    // proxies CurseForge files as a maven repository. Never compiled against, never packaged.
+    maven { url = 'https://cursemaven.com' }
 }
 
 dependencies {
@@ -64,6 +67,11 @@ dependencies {
     // Dev-run helper (NOT compiled against, NOT packaged): RDPMouse fixes the
     // camera-spinning-under-WSLg/RDP issue; toggle with F8 in game.
     runtimeOnly files("devmods/rdpmouse-neoforge-1.21.1-1.0.0.jar")
+    // Dev runs only: real ProjectE so the EMC bridge is exercised end to end
+    // (CreativeContainerProjectETests verifies the value through ProjectE itself).
+    // ProjectE 1.21.1-PE1.1.0, NeoForge build, MIT licensed. The mod stays optional:
+    // shipped code touches it only reflectively, and the EMC tests skip when it is absent.
+    runtimeOnly 'curse.maven:projecte-226410:6611984'
 }
 
 tasks.processResources {

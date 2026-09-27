@@ -3,6 +3,7 @@ package io.github.illagercpr.creativecontainer.gametest;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.SMOKE;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.check;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.checkEquals;
+import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.makeMockServerPlayer;
 import static io.github.illagercpr.creativecontainer.gametest.CreativeContainerTestSupport.placeContainer;
 
 import io.github.illagercpr.creativecontainer.CreativeContainer;
@@ -116,13 +117,10 @@ public final class CreativeContainerBlockTests {
         return total;
     }
 
-    // makeMockServerPlayerInLevel() is deprecated in NeoForge 21.1 with no replacement available; it is the only way
-    // to get a real ServerPlayer into a GameTest plot.
-    @SuppressWarnings("removal")
     @GameTest(template = SMOKE)
     public static void menuEditsPoolAndRespectsDistance(GameTestHelper helper) {
         CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
-        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        ServerPlayer player = makeMockServerPlayer(helper);
         // The mock player spawns at the world spawn point, far away from the plot: stillValid() would fail until the
         // player is actually standing next to the block.
         BlockPos absolute = helper.absolutePos(new BlockPos(1, 1, 1));
