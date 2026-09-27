@@ -1,0 +1,14 @@
+{
+  "block.creativecontainer.creative_container": "Creative Container",
+  "itemGroup.creativecontainer": "Creative Container",
+
+  "tooltip.creativecontainer.creative_container.1": "Unlimited items, taken straight from the creative inventory",
+  "tooltip.creativecontainer.creative_container.2": "Reports its contents to ME storage buses",
+
+  "gui.creativecontainer.search": "Search",
+  "gui.creativecontainer.search.hint": "Search items...",
+  "gui.creativecontainer.pool": "Pool: %s / %s",
+  "gui.creativecontainer.amount": "Amount",
+  "gui.creativecontainer.amount.label": "Reported amount",
+  "gui.creativecontainer.amount.tooltip": "How many of every item this container reports (1 - 2147483647)"
+}

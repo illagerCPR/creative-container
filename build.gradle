@@ -1,0 +1,80 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+
+version = project.mod_version
+group = project.mod_group_id
+
+base {
+    archivesName = project.mod_id
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(project.java_version as Integer)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:deprecation' << '-Xlint:unchecked'
+}
+
+neoForge {
+    version = project.neoforge_version
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+        gameTestServer {
+            type = "gameTestServer"
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+    }
+
+    mods {
+        creativecontainer {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Applied Energistics 2 is NEVER a hard dependency of this mod: the published jar
+    // only registers AE2 capabilities when `ae2` is actually loaded at runtime.
+    // We still compile against it (public appeng.api.** surface only) and run it in
+    // dev runs so the interop path is exercised for real.
+    compileOnly "org.appliedenergistics:appliedenergistics2:${project.ae2_version}"
+    // Dev runs only: never packaged, never referenced by shipped code paths.
+    runtimeOnly "org.appliedenergistics:appliedenergistics2:${project.ae2_version}"
+    // Dev-run helper (NOT compiled against, NOT packaged): RDPMouse fixes the
+    // camera-spinning-under-WSLg/RDP issue; toggle with F8 in game.
+    runtimeOnly files("devmods/rdpmouse-neoforge-1.21.1-1.0.0.jar")
+}
+
+tasks.processResources {
+    def expanded = [
+            'mod_version'           : project.mod_version,
+            'minecraft_version'     : project.minecraft_version,
+            'neoforge_version_range': project.neoforge_version_range,
+            'mod_license'           : project.mod_license
+    ]
+    inputs.properties(expanded)
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand expanded
+    }
+}

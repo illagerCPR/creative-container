@@ -1,0 +1,28 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "${mod_license}"
+issueTrackerURL = "https://github.com/illagerCPR/creative-container/issues"
+
+[[mods]]
+modId = "creativecontainer"
+version = "${mod_version}"
+displayName = "Creative Container"
+authors = "illagerCPR"
+description = '''
+An endgame creative-mode container for modpacks: unlimited items behind a creative-style GUI, reports its contents to
+ME storage buses (Applied Energistics 2), and carries an absurd ProjectE EMC value.
+'''
+
+[[dependencies.creativecontainer]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neoforge_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.creativecontainer]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version}]"
+ordering = "NONE"
+side = "BOTH"

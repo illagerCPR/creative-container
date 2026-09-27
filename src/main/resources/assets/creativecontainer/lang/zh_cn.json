@@ -1,0 +1,14 @@
+{
+  "block.creativecontainer.creative_container": "创造模式容器",
+  "itemGroup.creativecontainer": "创造模式容器",
+
+  "tooltip.creativecontainer.creative_container.1": "不限量物品，直接取自创造模式物品栏",
+  "tooltip.creativecontainer.creative_container.2": "内容物会报告给 ME 存储总线",
+
+  "gui.creativecontainer.search": "搜索",
+  "gui.creativecontainer.search.hint": "搜索物品……",
+  "gui.creativecontainer.pool": "容器池：%s / %s",
+  "gui.creativecontainer.amount": "数量",
+  "gui.creativecontainer.amount.label": "报告数量",
+  "gui.creativecontainer.amount.tooltip": "本容器向外界报告每种物品的数量（1 - 2147483647）"
+}

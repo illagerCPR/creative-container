@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+out/
+
+# Mod dev run directories
+run/
+runs/
+
+# Local dev-run helper mods (e.g. RDPMouse), never committed or packaged
+devmods/
+
+# OS
+.DS_Store

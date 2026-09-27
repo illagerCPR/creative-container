@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "creativecontainer:block/creative_container"
+    }
+  }
+}
