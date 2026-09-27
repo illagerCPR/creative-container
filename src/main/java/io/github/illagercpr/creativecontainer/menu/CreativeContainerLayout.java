@@ -15,11 +15,12 @@ public final class CreativeContainerLayout {
     /** Size of {@code textures/gui/slot.png} and of one item cell. */
     public static final int CELL = 18;
 
-    // left panel: creative item browser
+    // left panel: creative item browser. The grid ends at y = 40 + 9*18 = 202, exactly flush with the pool grid
+    // (148 + 3*18 = 202), so both columns share one bottom edge and one pagination line (y = 206).
     public static final int BROWSER_LEFT = 16;
-    public static final int BROWSER_TOP = 36;
+    public static final int BROWSER_TOP = 40;
     public static final int BROWSER_COLUMNS = 9;
-    public static final int BROWSER_ROWS = 5;
+    public static final int BROWSER_ROWS = 9;
 
     // right panel: player inventory. Slot positions are decided by CreativeContainerMenu, because Slot.x/y are final.
     public static final int PLAYER_PANEL_LEFT = 200;

@@ -26,7 +26,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * Creative-inventory-like screen for the creative container.
  *
- * <p><b>Left panel:</b> a search field plus a paged 9x5 grid of every item the creative tabs offer — the same source
+ * <p><b>Left panel:</b> a search field plus a paged 9x9 grid of every item the creative tabs offer — the same source
  * the vanilla creative inventory uses. Left click takes one, shift + left click takes a full stack, right click adds
  * the item to the container's pool.
  *
