@@ -27,6 +27,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * Creative-inventory-like screen for the creative container.
@@ -400,15 +401,37 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
         super.mouseMoved(mouseX, mouseY);
     }
 
+    /**
+     * While a text field has focus the keyboard belongs to it: {@code E} must type an "e", not close the screen,
+     * {@code Q} must not drop items, the hotbar keys must not swap, and (this mod's) {@code R} must not designate.
+     * <p>This is needed because {@link AbstractContainerScreen#keyPressed} checks those binds <em>after</em> the
+     * {@code super} chain, and {@link EditBox#keyPressed} returns {@code false} for plain letter keys — without an
+     * explicit swallow they would fall through to the container binds. {@code charTyped} is a separate event, so
+     * swallowing {@code keyPressed} still lets the character land in the field.
+     */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (amountBox != null && amountBox.isFocused() && (keyCode == 257 || keyCode == 335)) {
+        // Committing the amount field with Enter stays first: EditBox never consumes Enter.
+        if (amountBox != null && amountBox.isFocused() && (keyCode == GLFW.GLFW_KEY_ENTER
+                || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
             commitAmount();
             return true;
         }
-        // The outlet-selection key only fires outside of the text fields (otherwise typing "r" would designate).
         boolean editing = searchBox != null && searchBox.isFocused() || amountBox != null && amountBox.isFocused();
-        if (!editing && CCClient.SELECT_POOL_ITEM.matches(keyCode, scanCode)) {
+        if (editing) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                return super.keyPressed(keyCode, scanCode, modifiers); // still closes the screen
+            }
+            // Let the focused box consume the editing keys (arrows, backspace, Ctrl+A/C/V/X, ...), then swallow
+            // everything else so no bind — ours or another mod's — fires while the player is typing.
+            EditBox box = searchBox != null && searchBox.isFocused() ? searchBox : amountBox;
+            if (box != null) {
+                box.keyPressed(keyCode, scanCode, modifiers);
+            }
+            return true;
+        }
+        // The outlet-selection key only fires outside of the text fields (otherwise typing "r" would designate).
+        if (CCClient.SELECT_POOL_ITEM.matches(keyCode, scanCode)) {
             int cell = cellAt(hoverX, hoverY, POOL_LEFT, POOL_TOP, POOL_COLUMNS, POOL_ROWS);
             if (cell >= 0 && !poolStackAt(cell).isEmpty()) {
                 PacketDistributor.sendToServer(SelectPoolSlotPayload.select(poolPage * POOL_PAGE_SIZE + cell));
