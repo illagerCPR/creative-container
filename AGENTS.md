@@ -4,9 +4,9 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 **没有任何硬依赖**：AE2 / ProjectE / Project Expansion 全是**可选联动**，未安装时模组照常加载（相关类只在对方存在时才被加载）。
 
-## 当前状态（2026-09-27）
+## 当前状态（2026-09-28）
 
-**已发布 `v0.1.0`**（2026-09-27，GitHub Release 附产物 jar）。M0–M5 全部完成：GameTest **30 项全绿**——dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）；`runClient` 人工验收通过（三轮截图反馈全部修复）。后续功能见 `docs/02` 的「已知待办」。
+**已发布 `v0.1.1`**（2026-09-28，GitHub Release 附产物 jar）。M0–M6 全部完成：GameTest **34 项全绿**——dev 运行真实加载 **AE2 19.2.17**（联动 6 项，含真实 ME 网络端到端 2 项）与**真实 ProjectE 1.21.1-PE1.1.0**（cursemaven 引入，实机 EMC 1 项）；`runClient` 人工验收通过（v0.1.0 三轮 + v0.1.1 用户实测）。v0.1.1 内容：**无默认配方**（整合包自行配置）、**每池一个「管道出口槽」**（GUI 悬停池槽按 R 指定/取消、金色选定框、`IItemHandler` 仅出口槽出货）、**拼音搜索**（vendor PinIn 1.6.0）、**AE2 风浅色 UI**（池上/背包下、右页居中）、**输入框聚焦吞功能键**。后续功能见 `docs/02` 的「已知待办」。
 
 改设计先改 `docs/` 再动代码；需求权威来源是 `docs/00`。
 
@@ -40,7 +40,16 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 - **池容量是配置项**：`CCConfig.POOL_SLOTS`（默认 108，范围 9–4320）。`CreativeItemPool` 的 filled 槽始终是连续前缀 `[0, filledSlots)`；读档时有效容量 = `max(配置, 已存条目数)`（配置调小不影响已存档容器）。
 - **查找走哈希索引**：`item -> 槽位下标列表`（`CreativeItemPool.byItem`）只用于缩小候选，最终相等判断仍是 `isSameItemSameComponents`——组件变体（两把不同附魔剑）因此天然共存；不要把最终判断改成 `equals`/HashMap 语义。
-- **客户端镜像走增量 payload**：`PoolDeltaPayload`（server→client，`sendToPlayersTrackingChunk`，GameTest 无跟踪玩家即 no-op）。加物品=单槽 delta、改 N=仅数量、移除（触发压缩）=clearFirst 全量重排。chunk 加载仍走原版 getUpdateTag 全量快照。**不要**改回 `sendBlockUpdated` 整包推送（4320 槽时一次改动≈MB 级包）。
+- **每池一个「管道出口槽」**（v0.1.1）：`CreativeItemPool.designatedSlot`（NBT `DesignatedSlot`，默认 -1=全拒）。`CreativePoolItemHandler.extractItem(slot,...)` **仅当 slot==designatedSlot 时放行**（无限供给、池不减少），其余槽一律拒——管道（漏斗/Pipez/Create）零配置遍历即可，但只拿得到出口物品；`extractItemMatching` 不受出口限制。出口随压缩重排跟随物品（`repointDesignatedSlot`），物品被移除即回到 -1。指定/取消 = `BE.toggleDesignatedSlot`（空槽无操作），GUI 按 R（`KeyMapping`，默认 `R`）发 `SelectPoolSlotPayload`。
+- **客户端镜像走增量 payload**：`PoolDeltaPayload`（server→client，`sendToPlayersTrackingChunk`，GameTest 无跟踪玩家即 no-op；**协议版本 "2"**，record 含 `designatedSlot`）。加物品=单槽 delta、改 N/改出口=仅数量形 delta、移除（触发压缩）=clearFirst 全量重排。chunk 加载仍走原版 getUpdateTag 全量快照（含 `TAG_DESIGNATED`）。**不要**改回 `sendBlockUpdated` 整包推送（4320 槽时一次改动≈MB 级包）。
+- **AE2 ME 侧不受出口槽限制**：`CreativeContainerMeStorage.extract` 仍按「带物品键即可抽任意池内物品」（用户确认的口径，总线 UI 自带物品指定）。
+- **无默认配方**（v0.1.1 起）：`data/<ns>/recipe/` 不随模组分发，GameTest 断言 classpath 上不存在；获取途径 = 创造标签页 / `/give`。
+
+### PinIn（拼音搜索，v0.1.1 vendor）
+
+- **vendor 在 `pinyin/` 包**（`me.towdium.pinin` → 仅改包名，16 个源文件 + `data.txt` 字典约 295KB，MIT，源 = JitPack `com.github.Towdium:PinIn:1.6.0`；Maven Central **无**此制品）。`data.txt` 用 `PinIn.class.getResourceAsStream("data.txt")` 相对类路径加载 → **改包名必须连带移动 resources 路径**，否则 NPE。
+- PinIn 对非汉字字符**大小写敏感**（`contains("Diamond Sword","diamond")==false`）→ `CreativeItemIndex` 的 searchKey 与查询统一 lowercase 后进索引。预建索引 `TreeSearcher<Entry>(Logic.CONTAIN, pinIn)` 惰性构建、rebuild 后失效重建；查询结果需自行按 id 排序（树遍历序不稳定）。
+- JEC（Just Enough Characters）**只 hook JEI 搜索框、无通用 API**——自己 GUI 的拼音搜索只能 vendor PinIn，两者共存互不干扰。
 
 ### 1.21.1 / NeoForge 21.1.248 API
 
@@ -49,6 +58,8 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 - `Block#getCloneItemStack(LevelReader, ...)` 已过时且默认行为即所需 → 不要重写。
 - **`GuiGraphics.blit` 的短重载按 256×256 纹理采样**：非 256 尺寸贴图必须用 `(x, y, float u, float v, w, h, texW, texH)` 重载并传真实尺寸，否则 396×222 的背景被水平平铺 1.55 倍、18×18 的槽位贴图被涂抹成单像素色块（t2 截图实锤）。
 - **`AbstractContainerScreen.mouseClicked` 所有路径都返回 true**（含「点在界面外」的收尾 return）：自定义点击区域必须**先于** `super.mouseClicked` 处理，否则永远收不到点击（表象：界面上的自定义按钮/网格点了没反应，GameTest 直测菜单逻辑却全绿）。
+- **`AbstractContainerScreen.keyPressed` 的功能键检查（E 关界面 / Q 丢弃 / 1-9 换位）发生在 `super` 链之后**，而 `EditBox.keyPressed` 对普通字母返回 false → 自定义 Screen 带搜索框时**输入框聚焦按 E 会关界面**（v0.1.1a 实锤）。修法：聚焦时先手动调 focused EditBox 的 `keyPressed`，再除 ESC 一律 `return true` 吞掉；`charTyped` 独立成事件，吞 `keyPressed` 不影响字符输入。`KeyMapping` 拦截必须避开输入框聚焦态；`keyPressed` 拿不到光标 → 用 `mouseMoved` 记录悬停坐标。
+- `ItemStack.getTooltipLines` 是**三参** `(Item.TooltipContext, Player, TooltipFlag)`（`TooltipContext.of(Level)` 构造）；`TooltipFlag.NORMAL` 是接口静态字段；`GuiGraphics.renderTooltip(Font, List<Component>, Optional<TooltipComponent>, x, y)` 与 `renderOutline(x,y,w,h,color)` 可用于自绘 tooltip 行与选定框。
 - 方块提示签名：`appendHoverText(ItemStack, Item.TooltipContext, List<Component>, TooltipFlag)`（`TooltipContext` 是 `Item` 的内部类）。
 - 自定义容器 GUI：`IMenuTypeExtension.create(IContainerFactory)`；`openMenu(provider, pos)` 自动写 BlockPos；客户端 Screen 用 mod bus `RegisterMenuScreensEvent`；`AbstractContainerMenu` 没有 `getTitle()`。
 - `@EventBusSubscriber` 的 `bus` 属性已废弃 → 客户端监听写在主类构造器的 `FMLEnvironment.dist == Dist.CLIENT` 守卫里（`CCClient.register(modEventBus)`），dedicated server 不加载客户端类。
