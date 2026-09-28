@@ -58,6 +58,38 @@ public final class CreativeItemIndexTests {
         helper.succeed();
     }
 
+    /**
+     * Pinyin search (v0.1.1) is backed by the vendored PinIn copy. The GameTest server runs en_us, so the registry
+     * names carry no Chinese — the matcher is therefore exercised on synthetic strings, the way it sees translated
+     * display names on a zh_cn client.
+     */
+    @GameTest(template = INTEROP)
+    public static void pinyinSearchMatchesSyllablesAndFirstLetters(GameTestHelper helper) {
+        io.github.illagercpr.creativecontainer.pinyin.PinIn pinIn =
+                new io.github.illagercpr.creativecontainer.pinyin.PinIn();
+        pinIn.config().accelerate(true);
+
+        String diamondSword = "钻石剑";
+        check(pinIn.contains(diamondSword, "zuanshijian"), "full-syllable pinyin must match");
+        check(pinIn.contains(diamondSword, "zsj"), "first-letter pinyin must match");
+        check(!pinIn.contains(diamondSword, "ysj"), "wrong initials must not match");
+        // PinIn is case-sensitive for non-Chinese characters; the index lower-cases both sides, match that here.
+        check(pinIn.contains("diamond sword", "diamond"), "plain ASCII search keeps working through PinIn");
+        check(!pinIn.contains("Diamond Sword", "diamond"), "PinIn itself is case-sensitive: index lower-casing matters");
+
+        // The pre-built index the GUI uses returns candidates for the same queries.
+        io.github.illagercpr.creativecontainer.pinyin.searchers.TreeSearcher<String> searcher =
+                new io.github.illagercpr.creativecontainer.pinyin.searchers.TreeSearcher<>(
+                        io.github.illagercpr.creativecontainer.pinyin.searchers.Searcher.Logic.CONTAIN, pinIn);
+        searcher.put(diamondSword + "\u0000minecraft:diamond_sword", "diamond_sword");
+        searcher.put("金锭\u0000minecraft:gold_ingot", "gold_ingot");
+        check(searcher.search("zsj").contains("diamond_sword"), "the index must serve first-letter pinyin");
+        check(searcher.search("zuanshi").contains("diamond_sword"), "the index must serve full-syllable pinyin");
+        check(searcher.search("jd").contains("gold_ingot"), "the index must cover every entry");
+        check(!searcher.search("zsj").contains("gold_ingot"), "the index must not over-match");
+        helper.succeed();
+    }
+
     @GameTest(template = INTEROP)
     public static void creativeTabEntriesAreSingleNonAirStacks(GameTestHelper helper) {
         CreativeModeTab tab = CCCreativeTabs.MAIN.get();

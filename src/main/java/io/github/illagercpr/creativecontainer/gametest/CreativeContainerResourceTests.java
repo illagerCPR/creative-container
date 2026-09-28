@@ -44,6 +44,9 @@ public final class CreativeContainerResourceTests {
                 "gui.creativecontainer.amount",
                 "gui.creativecontainer.amount.label",
                 "gui.creativecontainer.amount.tooltip",
+                "gui.creativecontainer.designate.hint",
+                "key.categories.creativecontainer",
+                "key.creativecontainer.select_pool_item",
         };
         for (String locale : new String[]{"en_us", "zh_cn"}) {
             JsonObject json = json("/assets/" + NS + "/lang/" + locale + ".json");
@@ -93,10 +96,9 @@ public final class CreativeContainerResourceTests {
                 .getAsJsonArray("entries").get(0).getAsJsonObject().get("name").getAsString();
         checkEquals(NS + ":creative_container", dropped, "the block drops itself");
 
-        JsonObject recipe = json("/data/" + NS + "/recipe/creative_container.json");
-        checkEquals("minecraft:crafting_shaped", recipe.get("type").getAsString(), "recipe type");
-        checkEquals(NS + ":creative_container", recipe.getAsJsonObject("result").get("id").getAsString(),
-                "recipe result");
+        // v0.1.1: no recipe is shipped any more — modpack authors provide their own; the creative tab stays.
+        check(CreativeContainerResourceTests.class.getResourceAsStream("/data/" + NS + "/recipe/creative_container.json")
+                == null, "no default recipe may be shipped; modpacks configure their own");
         helper.succeed();
     }
 

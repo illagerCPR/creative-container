@@ -175,4 +175,14 @@ public class CreativeContainerMenu extends AbstractContainerMenu {
             blockEntity.setReportedAmount(amount);
         }
     }
+
+    /**
+     * Designates or clears the pool slot that generic logistics pipes pull from (the "select pipe outlet" key while
+     * hovering a pool slot).
+     */
+    public void handleSelectPoolSlot(int slot, Player player) {
+        if (blockEntity != null && stillValid(player)) {
+            blockEntity.toggleDesignatedSlot(slot);
+        }
+    }
 }

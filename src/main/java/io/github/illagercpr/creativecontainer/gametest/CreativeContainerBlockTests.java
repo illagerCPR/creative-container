@@ -60,32 +60,109 @@ public final class CreativeContainerBlockTests {
         helper.succeed();
     }
 
+    /**
+     * v0.1.1 semantics: slot-based extraction is served only from the designated pipe outlet. With no designation
+     * every slot refuses; after designating, the outlet is an endless source and the other slots stay shut.
+     */
     @GameTest(template = SMOKE)
-    public static void itemHandlerRefusesUnnamedExtraction(GameTestHelper helper) {
+    public static void itemHandlerServesOnlyTheDesignatedOutlet(GameTestHelper helper) {
         CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
         container.addItem(new ItemStack(Items.DIAMOND));
+        container.addItem(new ItemStack(Items.EMERALD));
 
         IItemHandler handler = helper.getLevel().getCapability(
                 Capabilities.ItemHandler.BLOCK, helper.absolutePos(new BlockPos(1, 1, 1)), null);
         check(handler != null, "the item handler capability must be exposed");
 
-        // Slot-based extraction cannot name an item, so it is refused outright.
+        // No designation -> every slot refuses.
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             check(handler.extractItem(slot, 64, false).isEmpty(),
-                    "extractItem(slot, ...) must be refused: " + slot);
+                    "extraction must be refused before an outlet is designated: " + slot);
         }
-        checkEquals(0, handler.getStackInSlot(1).getCount(), "empty slots stay empty");
-        checkEquals(Items.DIAMOND, handler.getStackInSlot(0).getItem(), "the template is visible");
 
-        // Insertion is refused: the container never stores anything.
+        // Designate slot 0 (diamonds): the outlet serves the item endlessly, everything else stays refused.
+        container.toggleDesignatedSlot(0);
+        checkEquals(16, handler.extractItem(0, 16, false).getCount(), "the outlet hands out the requested amount");
+        checkEquals(Items.DIAMOND, handler.extractItem(0, 64, false).getItem(), "the outlet keeps serving");
+        check(handler.extractItem(1, 64, false).isEmpty(), "other slots must stay refused");
+        check(container.pool().contains(new ItemStack(Items.DIAMOND)), "and never depletes the pool");
+
+        // Pressing the key on the designated slot again clears it.
+        container.toggleDesignatedSlot(0);
+        checkEquals(-1, container.designatedSlot(), "the designation must clear");
+        check(handler.extractItem(0, 16, false).isEmpty(), "after clearing, extraction is refused again");
+
+        // Empty slots cannot become the outlet.
+        container.toggleDesignatedSlot(5);
+        checkEquals(-1, container.designatedSlot(), "an empty slot must not become the outlet");
+
+        // The item-aware path is unaffected by the designation.
+        CreativePoolItemHandler poolHandler = container.itemHandler();
+        ItemStack extracted = poolHandler.extractItemMatching(new ItemStack(Items.EMERALD), 8);
+        checkEquals(8, extracted.getCount(), "item-aware extraction hands out the requested amount");
+
+        // Insertion is still refused: the container never stores anything.
         ItemStack leftover = handler.insertItem(0, new ItemStack(Items.DIAMOND, 32), false);
         checkEquals(32, leftover.getCount(), "insertion must be refused");
+        helper.succeed();
+    }
 
-        // The item-aware path works.
-        CreativePoolItemHandler poolHandler = container.itemHandler();
-        ItemStack extracted = poolHandler.extractItemMatching(new ItemStack(Items.DIAMOND), 16);
-        checkEquals(16, extracted.getCount(), "item-aware extraction hands out the requested amount");
-        check(container.pool().contains(new ItemStack(Items.DIAMOND)), "and never depletes the pool");
+    /** Each container owns its pool and its designation; neighbours never leak into each other. */
+    @GameTest(template = SMOKE)
+    public static void outletsAreIndependentPerContainer(GameTestHelper helper) {
+        CreativeContainerBlockEntity first = placeContainer(helper, 1, 1, 1);
+        CreativeContainerBlockEntity second = placeContainer(helper, 1, 2, 1);
+        first.addItem(new ItemStack(Items.DIAMOND));
+        second.addItem(new ItemStack(Items.GOLD_INGOT));
+
+        first.toggleDesignatedSlot(0);
+        checkEquals(0, first.designatedSlot(), "the first container designates its diamond");
+        checkEquals(-1, second.designatedSlot(), "the second container stays undesignated");
+
+        IItemHandler secondHandler = helper.getLevel().getCapability(
+                Capabilities.ItemHandler.BLOCK, helper.absolutePos(new BlockPos(1, 2, 1)), null);
+        check(secondHandler.extractItem(0, 8, false).isEmpty(), "the undesignated container must refuse extraction");
+
+        second.toggleDesignatedSlot(0);
+        checkEquals(8, secondHandler.extractItem(0, 8, false).getCount(), "the second outlet serves gold");
+        checkEquals(Items.GOLD_INGOT, secondHandler.extractItem(0, 8, false).getItem(), "its own item, not the neighbour's");
+        helper.succeed();
+    }
+
+    /** The designation is persisted and survives a save/reload cycle. */
+    @GameTest(template = SMOKE)
+    public static void designatedOutletSurvivesSaveAndLoad(GameTestHelper helper) {
+        CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
+        container.addItem(new ItemStack(Items.NETHER_STAR));
+        container.setReportedAmount(4242);
+        container.toggleDesignatedSlot(0);
+
+        net.minecraft.nbt.CompoundTag tag = container.saveCustomOnly(helper.getLevel().registryAccess());
+        CreativeContainerBlockEntity reloaded = new CreativeContainerBlockEntity(
+                container.getBlockPos(), container.getBlockState());
+        reloaded.loadCustomOnly(tag, helper.getLevel().registryAccess());
+
+        checkEquals(4242, reloaded.reportedAmount(), "the reported amount must survive a reload");
+        checkEquals(0, reloaded.designatedSlot(), "the designation must survive a reload");
+        check(reloaded.pool().contains(new ItemStack(Items.NETHER_STAR)), "pool contents must survive a reload");
+        helper.succeed();
+    }
+
+    /** Compaction moves the outlet with its item; removing the outlet item clears the designation. */
+    @GameTest(template = SMOKE)
+    public static void removalRepointsTheOutlet(GameTestHelper helper) {
+        CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
+        container.addItem(new ItemStack(Items.DIAMOND));
+        container.addItem(new ItemStack(Items.EMERALD));
+        container.toggleDesignatedSlot(1); // the emerald
+
+        container.removeSlot(0); // the diamond leaves; the emerald slides from slot 1 to slot 0
+        checkEquals(0, container.designatedSlot(), "the designation must follow the item through compaction");
+        checkSameStack(new ItemStack(Items.EMERALD), container.pool().getSlot(container.designatedSlot()),
+                "the outlet still points at the emerald");
+
+        container.removeSlot(0); // the emerald itself leaves
+        checkEquals(-1, container.designatedSlot(), "removing the outlet item must clear the designation");
         helper.succeed();
     }
 
@@ -110,21 +187,24 @@ public final class CreativeContainerBlockTests {
         CreativeContainerBlockEntity container = placeContainer(helper, 1, 1, 1);
         container.addItem(new ItemStack(Items.DIAMOND));
         container.setReportedAmount(99);
+        container.toggleDesignatedSlot(0);
 
         net.minecraft.nbt.CompoundTag updateTag = container.getUpdateTag(helper.getLevel().registryAccess());
         check(updateTag.contains(CreativeContainerBlockEntity.TAG_AMOUNT), "the update tag carries the amount");
+        check(updateTag.contains(CreativeContainerBlockEntity.TAG_DESIGNATED), "the update tag carries the outlet");
         CreativeContainerBlockEntity client = new CreativeContainerBlockEntity(
                 container.getBlockPos(), container.getBlockState());
         client.loadWithComponents(updateTag, helper.getLevel().registryAccess());
         checkEquals(99, client.reportedAmount(), "the mirrored container sees the amount");
+        checkEquals(0, client.designatedSlot(), "the mirrored container sees the outlet");
         check(client.pool().contains(new ItemStack(Items.DIAMOND)), "the mirrored container sees the pool");
         helper.succeed();
     }
 
     /**
      * In-game changes travel as incremental {@link PoolDeltaPayload}s instead of full block-entity snapshots. The
-     * mirror must apply all three delta shapes: a single added slot, an amount-only change and a full ordered resync
-     * (after a compaction).
+     * mirror must apply all four delta shapes: a single added slot, an amount-only change, a designation-only change
+     * and a full ordered resync (after a compaction).
      */
     @GameTest(template = SMOKE)
     public static void clientMirrorAppliesDeltas(GameTestHelper helper) {
@@ -140,24 +220,33 @@ public final class CreativeContainerBlockTests {
         checkEquals(77, mirror.reportedAmount(), "the snapshot carries the amount");
 
         // amount-only delta
-        mirror.applyClientDelta(PoolDeltaPayload.amount(server.getBlockPos(), 123));
+        mirror.applyClientDelta(PoolDeltaPayload.amount(server.getBlockPos(), 123, -1));
         checkEquals(123, mirror.reportedAmount(), "an amount-only delta updates the mirror");
         check(mirror.pool().contains(new ItemStack(Items.DIAMOND)), "an amount-only delta keeps the contents");
 
         // single-slot delta
         server.addItem(new ItemStack(Items.EMERALD));
-        mirror.applyClientDelta(PoolDeltaPayload.slot(server.getBlockPos(), 123, server.pool().filledSlots() - 1,
-                new ItemStack(Items.EMERALD)));
+        mirror.applyClientDelta(PoolDeltaPayload.slot(server.getBlockPos(), 123, -1,
+                server.pool().filledSlots() - 1, new ItemStack(Items.EMERALD)));
         check(mirror.pool().contains(new ItemStack(Items.EMERALD)), "a slot delta lands in the mirror");
         check(mirror.pool().contains(new ItemStack(Items.DIAMOND)), "a slot delta keeps the other entries");
 
+        // designation-only delta: the mirror's golden frame follows without touching the contents
+        mirror.applyClientDelta(PoolDeltaPayload.amount(server.getBlockPos(), 123, 0));
+        checkEquals(0, mirror.designatedSlot(), "a designation-only delta updates the outlet");
+        checkSameStack(server.pool().getSlot(0), mirror.pool().getSlot(0), "and keeps the contents");
+
         // full resync after a removal compacted the server pool
+        server.toggleDesignatedSlot(0); // the server designates the diamond too
         server.removeSlot(0);
-        mirror.applyClientDelta(PoolDeltaPayload.fullResync(server.getBlockPos(), 123, server.pool().availableItems()));
+        mirror.applyClientDelta(PoolDeltaPayload.fullResync(server.getBlockPos(), 123,
+                server.designatedSlot(), server.pool().availableItems()));
         check(!mirror.pool().contains(new ItemStack(Items.DIAMOND)), "the resync wipes removed entries");
         checkSameStack(server.pool().availableItems().get(0), mirror.pool().availableItems().get(0),
                 "the resync rebuilds the mirror in server order");
         checkEquals(server.pool().slotCount(), mirror.pool().slotCount(), "the resync keeps the size");
+        checkEquals(server.designatedSlot(), mirror.designatedSlot(),
+                "the resync carries the re-pointed outlet");
         helper.succeed();
     }
 
@@ -203,8 +292,14 @@ public final class CreativeContainerBlockTests {
         menu.handleRemoveSlot(0);
         check(container.availableItems().isEmpty(), "the GUI can remove a pool entry");
 
+        // The outlet designation goes through the menu as well, and respects the distance check like everything else.
+        menu.handleAddToPool(new ItemStack(Items.GOLD_INGOT));
+        menu.handleSelectPoolSlot(0, player);
+        checkEquals(0, container.designatedSlot(), "the GUI can designate the pipe outlet");
         player.teleportTo(helper.getLevel(), absolute.getX() + 64.0, absolute.getY(), absolute.getZ(), 0.0F, 0.0F);
         check(!menu.stillValid(player), "the menu must close when the player walks away");
+        menu.handleSelectPoolSlot(1, player);
+        checkEquals(0, container.designatedSlot(), "a far-away player cannot change the outlet");
         helper.succeed();
     }
 }

@@ -6,9 +6,13 @@
   "tooltip.creativecontainer.creative_container.2": "Reports its contents to ME storage buses",
 
   "gui.creativecontainer.search": "Search",
-  "gui.creativecontainer.search.hint": "Search items...",
+  "gui.creativecontainer.search.hint": "Search items... (pinyin works too, e.g. zsj)",
   "gui.creativecontainer.pool": "Pool: %s / %s",
   "gui.creativecontainer.amount": "Amount",
   "gui.creativecontainer.amount.label": "Reported amount",
-  "gui.creativecontainer.amount.tooltip": "How many of every item this container reports (1 - 2147483647)"
+  "gui.creativecontainer.amount.tooltip": "How many of every item this container reports (1 - 2147483647)",
+  "gui.creativecontainer.designate.hint": "Press R to serve this item to logistics pipes",
+
+  "key.categories.creativecontainer": "Creative Container",
+  "key.creativecontainer.select_pool_item": "Designate pipe outlet item"
 }

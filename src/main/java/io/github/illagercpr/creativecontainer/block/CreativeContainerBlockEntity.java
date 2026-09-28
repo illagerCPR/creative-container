@@ -34,6 +34,7 @@ public class CreativeContainerBlockEntity extends BlockEntity {
 
     public static final String TAG_POOL = "Pool";
     public static final String TAG_AMOUNT = "ReportedAmount";
+    public static final String TAG_DESIGNATED = "DesignatedSlot";
 
     private final CreativeItemPool pool = new CreativeItemPool(defaultPoolSlots());
     private final CreativePoolItemHandler itemHandler = new CreativePoolItemHandler(pool);
@@ -63,16 +64,43 @@ public class CreativeContainerBlockEntity extends BlockEntity {
 
     public void setReportedAmount(int amount) {
         if (pool.setReportedAmount(amount)) {
-            pushDelta(PoolDeltaPayload.amount(worldPosition, pool.reportedAmount()));
+            pushDelta(PoolDeltaPayload.amount(worldPosition, pool.reportedAmount(), pool.designatedSlot()));
         }
+    }
+
+    /** The slot generic logistics pipes pull from, or {@code -1} when extraction is refused entirely. */
+    public int designatedSlot() {
+        return pool.designatedSlot();
+    }
+
+    /**
+     * Designates or re-designates the pipe outlet from the GUI: pressing the selection key on the already designated
+     * slot clears it, pressing it on an empty slot does nothing. @return whether the designation changed
+     */
+    public boolean toggleDesignatedSlot(int index) {
+        if (index == pool.designatedSlot()) {
+            if (pool.setDesignatedSlot(CreativeItemPool.NO_DESIGNATED_SLOT)) {
+                pushDelta(PoolDeltaPayload.amount(worldPosition, pool.reportedAmount(), pool.designatedSlot()));
+                return true;
+            }
+            return false;
+        }
+        if (index < 0 || index >= pool.slotCount() || pool.getSlot(index).isEmpty()) {
+            return false;
+        }
+        if (pool.setDesignatedSlot(index)) {
+            pushDelta(PoolDeltaPayload.amount(worldPosition, pool.reportedAmount(), pool.designatedSlot()));
+            return true;
+        }
+        return false;
     }
 
     /** Adds one template stack to the pool. @return whether the pool changed */
     public boolean addItem(ItemStack stack) {
         if (pool.addItem(stack)) {
             // A new item always lands at the end of the contiguous filled prefix.
-            pushDelta(PoolDeltaPayload.slot(worldPosition, pool.reportedAmount(), pool.filledSlots() - 1,
-                    pool.getSlot(pool.filledSlots() - 1)));
+            pushDelta(PoolDeltaPayload.slot(worldPosition, pool.reportedAmount(), pool.designatedSlot(),
+                    pool.filledSlots() - 1, pool.getSlot(pool.filledSlots() - 1)));
             return true;
         }
         return false;
@@ -83,7 +111,8 @@ public class CreativeContainerBlockEntity extends BlockEntity {
         if (pool.removeSlot(index)) {
             // Compaction reorders the tail, so the mirror gets a full ordered resync. Removals are a manual GUI
             // action, which keeps this rare.
-            pushDelta(PoolDeltaPayload.fullResync(worldPosition, pool.reportedAmount(), pool.availableItems()));
+            pushDelta(PoolDeltaPayload.fullResync(worldPosition, pool.reportedAmount(), pool.designatedSlot(),
+                    pool.availableItems()));
             return true;
         }
         return false;
@@ -128,12 +157,15 @@ public class CreativeContainerBlockEntity extends BlockEntity {
         for (PoolDeltaPayload.SlotChange change : payload.changes()) {
             pool.setSlot(change.index(), change.stack());
         }
+        // Last: the designation is only valid once the slot contents it points at are in place.
+        pool.setDesignatedSlot(payload.designatedSlot());
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt(TAG_AMOUNT, pool.reportedAmount());
+        tag.putInt(TAG_DESIGNATED, pool.designatedSlot());
         ContainerHelper.saveAllItems(tag, pool.slots(), registries);
     }
 
@@ -151,6 +183,7 @@ public class CreativeContainerBlockEntity extends BlockEntity {
         }
         ContainerHelper.loadAllItems(tag, slots, registries);
         pool.setReportedAmount(tag.contains(TAG_AMOUNT) ? tag.getInt(TAG_AMOUNT) : defaultReportedAmount());
+        pool.setDesignatedSlot(tag.contains(TAG_DESIGNATED) ? tag.getInt(TAG_DESIGNATED) : CreativeItemPool.NO_DESIGNATED_SLOT);
         pool.compact();
     }
 

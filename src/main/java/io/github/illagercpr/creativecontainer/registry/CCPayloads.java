@@ -7,6 +7,7 @@ import io.github.illagercpr.creativecontainer.network.AddToPoolPayload;
 import io.github.illagercpr.creativecontainer.network.PickItemPayload;
 import io.github.illagercpr.creativecontainer.network.PoolDeltaPayload;
 import io.github.illagercpr.creativecontainer.network.PoolEditPayload;
+import io.github.illagercpr.creativecontainer.network.SelectPoolSlotPayload;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -22,7 +23,8 @@ public final class CCPayloads {
     }
 
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
+        // "2": PoolDeltaPayload gained the designated pipe outlet field (v0.1.1).
+        PayloadRegistrar registrar = event.registrar("2");
 
         registrar.playToServer(PickItemPayload.TYPE, PickItemPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof CreativeContainerMenu menu) {
@@ -43,6 +45,12 @@ public final class CCPayloads {
         registrar.playToServer(AddToPoolPayload.TYPE, AddToPoolPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof CreativeContainerMenu menu) {
                 menu.handleAddToPool(payload.stack());
+            }
+        });
+
+        registrar.playToServer(SelectPoolSlotPayload.TYPE, SelectPoolSlotPayload.STREAM_CODEC, (payload, context) -> {
+            if (context.player().containerMenu instanceof CreativeContainerMenu menu) {
+                menu.handleSelectPoolSlot(payload.slot(), context.player());
             }
         });
 

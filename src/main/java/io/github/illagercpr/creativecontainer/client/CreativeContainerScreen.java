@@ -2,6 +2,7 @@ package io.github.illagercpr.creativecontainer.client;
 
 import io.github.illagercpr.creativecontainer.CreativeContainer;
 import io.github.illagercpr.creativecontainer.block.CreativeContainerBlockEntity;
+import io.github.illagercpr.creativecontainer.client.CCClient;
 import io.github.illagercpr.creativecontainer.container.CreativeItemIndex;
 import io.github.illagercpr.creativecontainer.container.CreativeItemPool;
 import io.github.illagercpr.creativecontainer.menu.CreativeContainerLayout;
@@ -9,8 +10,11 @@ import io.github.illagercpr.creativecontainer.menu.CreativeContainerMenu;
 import io.github.illagercpr.creativecontainer.network.AddToPoolPayload;
 import io.github.illagercpr.creativecontainer.network.PickItemPayload;
 import io.github.illagercpr.creativecontainer.network.PoolEditPayload;
+import io.github.illagercpr.creativecontainer.network.SelectPoolSlotPayload;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -21,6 +25,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
@@ -70,6 +75,10 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
     private int page;
     private int poolPage;
     private List<CreativeItemIndex.Entry> filtered = List.of();
+
+    /** Last known cursor position, needed because the select key fires from {@link #keyPressed} without coordinates. */
+    private double hoverX;
+    private double hoverY;
 
     public CreativeContainerScreen(CreativeContainerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -133,6 +142,7 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
         drawBrowserItems(graphics);
         drawPoolItems(graphics);
+        drawDesignatedOutline(graphics);
         drawHover(graphics, mouseX, mouseY);
     }
 
@@ -171,6 +181,29 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
         }
     }
 
+    /**
+     * The slot generic logistics pipes pull from gets a permanent golden frame (v0.1.1). Only the currently visible
+     * pool page can show it; the designation itself lives server-side.
+     */
+    private void drawDesignatedOutline(GuiGraphics graphics) {
+        CreativeContainerBlockEntity container = menu.blockEntity();
+        if (container == null) {
+            return;
+        }
+        int designated = container.designatedSlot();
+        if (designated < 0) {
+            return;
+        }
+        int relative = designated - poolPage * POOL_PAGE_SIZE;
+        if (relative < 0 || relative >= POOL_PAGE_SIZE) {
+            return;
+        }
+        int x = leftPos + POOL_LEFT + (relative % POOL_COLUMNS) * CELL;
+        int y = topPos + POOL_TOP + (relative / POOL_COLUMNS) * CELL;
+        graphics.renderOutline(x + 1, y + 1, CELL - 2, CELL - 2, 0xFFFFD040);
+        graphics.renderOutline(x + 2, y + 2, CELL - 4, CELL - 4, 0x90FFD040);
+    }
+
     private void drawHover(GuiGraphics graphics, int mouseX, int mouseY) {
         int browserCell = cellAt(mouseX, mouseY, GRID_LEFT, GRID_TOP, COLUMNS, ROWS);
         if (browserCell >= 0 && page * PAGE_SIZE + browserCell < filtered.size()) {
@@ -186,7 +219,8 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
     private void highlight(GuiGraphics graphics, int gridLeft, int gridTop, int cell, int columns) {
         int x = leftPos + gridLeft + (cell % columns) * CELL + 1;
         int y = topPos + gridTop + (cell / columns) * CELL + 1;
-        graphics.fill(x, y, x + 16, y + 16, 0x66FFFFFF);
+        // the vanilla slot-highlight colour: visible on the light AE2-style background as well
+        graphics.fill(x, y, x + 16, y + 16, 0x80FFFFFF);
     }
 
     private int itemX(int index) {
@@ -212,7 +246,8 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
         CreativeContainerBlockEntity container = menu.blockEntity();
         int filled = container == null ? 0 : container.pool().availableItems().size();
-        graphics.drawString(font, Component.translatable("gui.creativecontainer.pool", filled, poolSlotCount()),
+        int slots = container == null ? CreativeItemPool.DEFAULT_SLOT_COUNT : container.pool().slotCount();
+        graphics.drawString(font, Component.translatable("gui.creativecontainer.pool", filled, slots),
                 POOL_LEFT, POOL_HEADER_Y, 0x404040, false);
         // Right of the amount box: the slot above it belongs to the pool header, so a label there would overlap.
         graphics.drawString(font, Component.translatable("gui.creativecontainer.amount.label"),
@@ -230,10 +265,6 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
         return (page + 1) + " / " + totalPages + "   (" + filtered.size() + ")";
     }
 
-    private static int poolSlotCount() {
-        return CreativeItemPool.DEFAULT_SLOT_COUNT;
-    }
-
     private int poolPageCount() {
         CreativeContainerBlockEntity container = menu.blockEntity();
         int slots = container == null ? CreativeItemPool.DEFAULT_SLOT_COUNT : container.pool().slotCount();
@@ -242,6 +273,17 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
 
     @Override
     protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        // Pool slots get one extra line teaching the outlet-selection key; everything else keeps vanilla behaviour.
+        int poolCell = cellAt(mouseX, mouseY, POOL_LEFT, POOL_TOP, POOL_COLUMNS, POOL_ROWS);
+        ItemStack poolStack = poolCell >= 0 ? poolStackAt(poolCell) : ItemStack.EMPTY;
+        if (!poolStack.isEmpty()) {
+            List<Component> lines = new ArrayList<>(poolStack.getTooltipLines(
+                    net.minecraft.world.item.Item.TooltipContext.of(minecraft.level), minecraft.player,
+                    TooltipFlag.NORMAL));
+            lines.add(Component.translatable("gui.creativecontainer.designate.hint").withStyle(ChatFormatting.GRAY));
+            graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
+            return;
+        }
         ItemStack hovered = hoveredStack(mouseX, mouseY);
         if (!hovered.isEmpty()) {
             graphics.renderTooltip(font, hovered, mouseX, mouseY);
@@ -352,10 +394,26 @@ public class CreativeContainerScreen extends AbstractContainerScreen<CreativeCon
     }
 
     @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        hoverX = mouseX;
+        hoverY = mouseY;
+        super.mouseMoved(mouseX, mouseY);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (amountBox != null && amountBox.isFocused() && (keyCode == 257 || keyCode == 335)) {
             commitAmount();
             return true;
+        }
+        // The outlet-selection key only fires outside of the text fields (otherwise typing "r" would designate).
+        boolean editing = searchBox != null && searchBox.isFocused() || amountBox != null && amountBox.isFocused();
+        if (!editing && CCClient.SELECT_POOL_ITEM.matches(keyCode, scanCode)) {
+            int cell = cellAt(hoverX, hoverY, POOL_LEFT, POOL_TOP, POOL_COLUMNS, POOL_ROWS);
+            if (cell >= 0 && !poolStackAt(cell).isEmpty()) {
+                PacketDistributor.sendToServer(SelectPoolSlotPayload.select(poolPage * POOL_PAGE_SIZE + cell));
+                return true;
+            }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }

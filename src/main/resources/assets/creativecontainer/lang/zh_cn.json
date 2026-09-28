@@ -6,9 +6,13 @@
   "tooltip.creativecontainer.creative_container.2": "内容物会报告给 ME 存储总线",
 
   "gui.creativecontainer.search": "搜索",
-  "gui.creativecontainer.search.hint": "搜索物品……",
+  "gui.creativecontainer.search.hint": "搜索物品……（支持拼音，如 zsj）",
   "gui.creativecontainer.pool": "容器池：%s / %s",
   "gui.creativecontainer.amount": "数量",
   "gui.creativecontainer.amount.label": "报告数量",
-  "gui.creativecontainer.amount.tooltip": "本容器向外界报告每种物品的数量（1 - 2147483647）"
+  "gui.creativecontainer.amount.tooltip": "本容器向外界报告每种物品的数量（1 - 2147483647）",
+  "gui.creativecontainer.designate.hint": "按 R 将此物品指定为管道输出",
+
+  "key.categories.creativecontainer": "创造模式容器",
+  "key.creativecontainer.select_pool_item": "指定管道输出物品"
 }

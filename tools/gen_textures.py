@@ -33,6 +33,16 @@ CYAN = (64, 214, 230, 255)
 CYAN_BRIGHT = (176, 255, 255, 255)
 VIOLET = (146, 96, 214, 255)
 
+# ---- AE2-style light GUI palette (screen + slot only; the block face stays a dark machine) ----
+GUI_OUTLINE = (26, 26, 26, 255)          # near-black outer frame
+GUI_PANEL = (198, 198, 198, 255)         # the classic light container grey
+GUI_EDGE_LIGHT = (255, 255, 255, 255)    # top/left bevel highlight
+GUI_EDGE_DARK = (85, 85, 85, 255)        # bottom/right bevel shadow
+GUI_WELL = (139, 139, 139, 255)          # recessed grid area
+GUI_WELL_EDGE = (55, 55, 55, 255)        # recessed border
+GUI_ACCENT = (139, 91, 214, 255)         # AE2 violet accent bar
+GUI_ACCENT_DARK = (94, 60, 169, 255)
+
 
 def noise(color, rng, amount=6):
     return (
@@ -93,41 +103,47 @@ def block_texture() -> Image.Image:
 
 
 def slot_texture() -> Image.Image:
-    """One inventory cell; drawn by the screen on top of the background."""
-    img = Image.new("RGBA", (18, 18), PANEL_DARK)
+    """One inventory cell (18x18): a light recessed well with a vanilla-style bevel."""
+    img = Image.new("RGBA", (18, 18), GUI_WELL)
     draw = ImageDraw.Draw(img)
-    draw.rectangle((0, 0, 17, 17), outline=STEEL_DARK)
-    draw.line((1, 1, 16, 1), fill=STEEL_DARK)
-    draw.line((1, 1, 1, 16), fill=STEEL_DARK)
-    # a faint inner well so items read as "inside" the cell
-    draw.rectangle((2, 2, 15, 15), outline=(20, 22, 28, 255))
+    # outer hairline + inner bevel: dark top/left, light bottom/right reads as "recessed"
+    draw.rectangle((0, 0, 17, 17), outline=GUI_WELL_EDGE)
+    draw.line((1, 1, 16, 1), fill=GUI_EDGE_DARK)
+    draw.line((1, 1, 1, 16), fill=GUI_EDGE_DARK)
+    draw.line((2, 16, 16, 16), fill=GUI_EDGE_LIGHT)
+    draw.line((16, 2, 16, 15), fill=GUI_EDGE_LIGHT)
     return img
 
 
 def screen_background(width: int = 396, height: int = 222) -> Image.Image:
-    """Two-panel layout: left = creative item browser, right = player inventory + pool."""
-    img = Image.new("RGBA", (width, height), PANEL_DARK)
+    """AE2-style light two-panel layout.
+
+    Mirrors ``CreativeContainerLayout``: left = creative item browser (grid 16..178 x 40..202), right = the pool on
+    top (grid 214..376 x 56..110) and the player inventory below (grid 214..376 x 126..202, hotbar flush at y=202),
+    both centred on the right page so nothing hugs the page's left border.
+    """
+    img = Image.new("RGBA", (width, height), GUI_PANEL)
     draw = ImageDraw.Draw(img)
 
-    # outer frame
-    draw.rectangle((0, 0, width - 1, height - 1), outline=OUTLINE)
-    draw.rectangle((1, 1, width - 2, height - 2), outline=STEEL_DARK)
+    # outer frame: black hairline, then a vanilla bevel (light top/left, dark bottom/right)
+    draw.rectangle((0, 0, width - 1, height - 1), outline=GUI_OUTLINE)
+    draw.line((1, 1, width - 2, 1), fill=GUI_EDGE_LIGHT)
+    draw.line((1, 1, 1, height - 2), fill=GUI_EDGE_LIGHT)
+    draw.line((1, height - 2, width - 2, height - 2), fill=GUI_EDGE_DARK)
+    draw.line((width - 2, 2, width - 2, height - 2), fill=GUI_EDGE_DARK)
 
-    # left browser panel
-    draw.rectangle((6, 4, 191, height - 5), fill=PANEL, outline=STEEL_DARK)
-    # right panel (inventory + pool)
-    draw.rectangle((199, 4, width - 7, height - 5), fill=PANEL, outline=STEEL_DARK)
+    # centre seam between the pages: a thin recessed groove at x = 193..197
+    draw.rectangle((193, 6, 197, height - 7), fill=GUI_WELL, outline=GUI_WELL_EDGE)
 
-    # accent bars
-    draw.rectangle((7, 5, 190, 6), fill=CYAN_DIM)
-    draw.rectangle((200, 5, width - 8, 6), fill=CYAN_DIM)
+    # violet accent bars on top of both pages
+    draw.rectangle((7, 5, 190, 6), fill=GUI_ACCENT, outline=GUI_ACCENT_DARK)
+    draw.rectangle((200, 5, width - 8, 6), fill=GUI_ACCENT, outline=GUI_ACCENT_DARK)
 
-    # recessed areas for the two item grids and the pool
-    draw.rectangle((14, 34, 180, 128), fill=PANEL_DARK, outline=STEEL_DARK)
-    draw.rectangle((198, 146, 364, 200), fill=PANEL_DARK, outline=STEEL_DARK)
-
-    # recessed area behind the player inventory
-    draw.rectangle((198, 34, 364, 116), fill=PANEL_DARK, outline=STEEL_DARK)
+    # recessed wells: the browser grid, the pool grid, the amount field and the player inventory
+    draw.rectangle((14, 38, 180, 204), fill=GUI_WELL, outline=GUI_WELL_EDGE)      # browser 9x9
+    draw.rectangle((212, 54, 378, 112), fill=GUI_WELL, outline=GUI_WELL_EDGE)     # pool 9x3
+    draw.rectangle((212, 40, 312, 54), fill=GUI_WELL, outline=GUI_WELL_EDGE)      # amount field (96x12 + bevel)
+    draw.rectangle((212, 124, 378, 204), fill=GUI_WELL, outline=GUI_WELL_EDGE)    # inventory + hotbar
     return img
 
 

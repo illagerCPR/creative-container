@@ -40,11 +40,20 @@ public final class CreativeItemPool {
     public static final int MAX_SLOT_COUNT = 4320;
     public static final int DEFAULT_SLOT_COUNT = 108;
 
+    /** {@code designatedSlot} value meaning "no pipe outlet designated": every slot refuses extraction. */
+    public static final int NO_DESIGNATED_SLOT = -1;
+
     private NonNullList<ItemStack> slots;
     private int slotCount;
 
     /** Number of filled slots; filled slots are always the contiguous prefix {@code [0, filled)}. */
     private int filled;
+
+    /**
+     * The one slot generic logistics pipes may pull from ({@link #NO_DESIGNATED_SLOT} when none). The designation is
+     * made per container from the GUI, so each pool ships exactly one item type to every pipe without configuration.
+     */
+    private int designatedSlot = NO_DESIGNATED_SLOT;
 
     /** item -> slot indices currently holding that item; keeps {@link #contains} off the linear scan. */
     private final Map<net.minecraft.world.item.Item, IntList> byItem = new HashMap<>();
@@ -112,6 +121,31 @@ public final class CreativeItemPool {
         return filled == 0;
     }
 
+    /** The slot generic pipes may pull from, or {@link #NO_DESIGNATED_SLOT} when extraction is refused entirely. */
+    public int designatedSlot() {
+        return designatedSlot;
+    }
+
+    /**
+     * Points the pipe outlet at {@code index}. An out-of-range or empty slot clears the designation instead, so a
+     * stale index can never leak items.
+     *
+     * @return true when the designation changed
+     */
+    public boolean setDesignatedSlot(int index) {
+        int target = index >= 0 && index < slotCount && !slots.get(index).isEmpty() ? index : NO_DESIGNATED_SLOT;
+        if (target == designatedSlot) {
+            return false;
+        }
+        designatedSlot = target;
+        return true;
+    }
+
+    /** The item the pipe outlet serves, or {@link ItemStack#EMPTY} when extraction is refused. */
+    public ItemStack designatedStack() {
+        return designatedSlot == NO_DESIGNATED_SLOT ? ItemStack.EMPTY : slots.get(designatedSlot);
+    }
+
     public ItemStack getSlot(int index) {
         return index >= 0 && index < slotCount ? slots.get(index) : ItemStack.EMPTY;
     }
@@ -155,6 +189,8 @@ public final class CreativeItemPool {
 
     /** Moves every filled slot to the front so the GUI never shows holes. */
     public void compact() {
+        // The designation follows its item: compaction reshuffles indices, so re-resolve it afterwards.
+        ItemStack designated = designatedStack();
         List<ItemStack> items = new ArrayList<>(filled);
         for (ItemStack stack : slots) {
             if (!stack.isEmpty()) {
@@ -166,6 +202,7 @@ public final class CreativeItemPool {
         }
         filled = items.size();
         rebuildIndex();
+        repointDesignatedSlot(designated);
     }
 
     /** Empties the pool (used by the client mirror when a full resync arrives). */
@@ -175,6 +212,7 @@ public final class CreativeItemPool {
         }
         filled = 0;
         byItem.clear();
+        designatedSlot = NO_DESIGNATED_SLOT;
     }
 
     /**
@@ -258,6 +296,24 @@ public final class CreativeItemPool {
         for (int i = 0; i < filled; i++) {
             byItem.computeIfAbsent(slots.get(i).getItem(), item -> new IntArrayList()).add(i);
         }
+    }
+
+    /**
+     * After an index reshuffle, re-resolves the pipe outlet by its item ({@link ItemStack#isSameItemSameComponents}):
+     * pool items are unique, so the item identifies the slot unambiguously. A removed item clears the designation.
+     */
+    private void repointDesignatedSlot(ItemStack designated) {
+        if (designated.isEmpty()) {
+            designatedSlot = NO_DESIGNATED_SLOT;
+            return;
+        }
+        for (int i = 0; i < filled; i++) {
+            if (ItemStack.isSameItemSameComponents(slots.get(i), designated)) {
+                designatedSlot = i;
+                return;
+            }
+        }
+        designatedSlot = NO_DESIGNATED_SLOT;
     }
 
     private void removeFromIndex(net.minecraft.world.item.Item item, int index) {

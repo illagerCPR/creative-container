@@ -8,11 +8,16 @@ import org.jetbrains.annotations.Nullable;
  * Bridges a {@link CreativeItemPool} to the generic NeoForge item handler capability so that hoppers, pipes and other
  * mods see the pool.
  *
- * <p>Extraction rules mirror the ME side:
+ * <p>Extraction rules (modpack requirement v0.1.1):
  * <ul>
- *     <li>{@link #extractItem(int, int, boolean)} cannot name an item by definition, so it is refused with
- *     {@link ItemStack#EMPTY} — this mod never lets a caller pull "something" out of an infinite source.</li>
- *     <li>{@link #extractItemMatching} is the explicit, item-aware entry point used by our own code and tests.</li>
+ *     <li>Slot-based extraction ({@link #extractItem(int, int, boolean)}) is served <em>only</em> from the pool's
+ *     designated pipe outlet — the one slot a player picked in the GUI. Pipes need no configuration: they walk the
+ *     slots as usual and simply never receive anything from the other ones, while the outlet is an endless source
+ *     (the pool never depletes and {@code simulate} therefore makes no difference).</li>
+ *     <li>With no outlet designated every slot refuses: this mod never lets a caller pull "something" out of an
+ *     infinite source.</li>
+ *     <li>{@link #extractItemMatching} is the item-aware entry point used by our own code and tests; it is not
+ *     restricted by the outlet designation.</li>
  * </ul>
  */
 public final class CreativePoolItemHandler implements IItemHandler {
@@ -56,12 +61,21 @@ public final class CreativePoolItemHandler implements IItemHandler {
 
     @Override
     public ItemStack extractItem(int slot, int amount, boolean simulate) {
-        // No item specified -> refuse.
-        return ItemStack.EMPTY;
+        if (amount <= 0 || slot != pool.designatedSlot()) {
+            // Not the designated outlet (or nothing designated at all) -> refuse.
+            return ItemStack.EMPTY;
+        }
+        ItemStack template = pool.designatedStack();
+        if (template.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        int handed = Math.min(Math.min(amount, template.getMaxStackSize()), pool.reportedAmount());
+        return handed <= 0 ? ItemStack.EMPTY : template.copyWithCount(handed);
     }
 
     /**
-     * Item-aware extraction. Returns {@link ItemStack#EMPTY} when the pool does not hold the requested item.
+     * Item-aware extraction, unaffected by the pipe outlet designation. Returns {@link ItemStack#EMPTY} when the pool
+     * does not hold the requested item.
      */
     public ItemStack extractItemMatching(ItemStack requested, int amount) {
         long extracted = pool.extract(requested, amount);
