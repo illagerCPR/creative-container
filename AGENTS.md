@@ -80,7 +80,7 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 - 对话与文档用简体中文；**源代码标识符一律英文，禁止拼音**。
 - 文档除 `AGENTS.md` / `README.md` 外一律放 `docs/`。
-- 每完成一个批次立即 `git push origin main`，`gh run list --repo illagerCPR/creative-container --commit <sha>` + `gh run watch <runId> --exit-status` 等绿；**每批次完成后停下等用户明确指令**，不自动连跑。
+- 每完成一个批次立即 `git push origin main`，`gh run list --repo illagerCPR/creative-container --commit <sha>` + `gh run watch <runId> --exit-status` 等绿；**每批次完成后停下等用户明确指令**，不自动连跑。**纯文档提交**（仅 README / docs / AGENTS 等 markdown 变更，无代码与资源）push 即收尾，**不等待 CI**（用户 2026-09-28 指示）。
 - 版本号唯一来源：`gradle.properties` 的 `mod_version`。
 - commit/tag 用全局 GPG 签名；推送必须用 GitHub 隐私邮箱 `63698328+illagerCPR@users.noreply.github.com`。
 - 验证分层：机制正确性进 GameTest，观感与手感靠 `runClient` 人工验收。
