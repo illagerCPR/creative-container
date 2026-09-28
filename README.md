@@ -4,9 +4,11 @@
 
 **Minecraft 1.21.1 · NeoForge 21.1.248 · 无硬依赖（AE2 / ProjectE / Project Expansion 均为可选联动）**
 
+当前版本 **v0.1.1**（2026-09-28）：无默认配方、管道输出指定（R 键）、拼音搜索、AE2 风浅色界面。
+
 ## 它是什么
 
-「创造模式容器」是一个带 GUI 的方块。你在 GUI 里像创造模式物品栏那样搜索、翻页、取出任意物品，也可以把物品**放进容器的池子**；放进池子的物品从此**不限量**——外部设备（ME 存储总线、管道、漏斗）可以从容器里**按需抽取**，永远抽不完。
+「创造模式容器」是一个带 GUI 的方块。你在 GUI 里像创造模式物品栏那样搜索（支持拼音）、翻页、取出任意物品，也可以把物品**放进容器的池子**；放进池子的物品从此**不限量**——外部设备可以从容器里**按需抽取**，永远抽不完：AE2 ME 存储总线在总线 UI 里指定物品即可抽任意池内物品；通用物流管道（漏斗、Pipez、Create 等）抽取的则是 GUI 里用 R 键指定的那个「管道输出」物品。
 
 它不产出资源，也不主动注入网络：**抽取永远由外部设备发起**，因此不会变成「开机即无限 EMC」的失控机器。
 
@@ -48,13 +50,11 @@ EMC 值由本模组自动写入 ProjectE 的自定义 EMC（`config/ProjectE/cus
 
 ## 获取方式
 
-默认配方（可被整合包用数据包覆盖或删除）：
+**本模组不随包提供任何合成配方**（v0.1.1 起，由整合包作者自行配置）：
 
-```
-N D N       N = 下界之星
-D E D       D = 下界合金块
-N D N       E = 龙蛋
-```
+- 创造模式物品栏的「创造模式容器」标签页直接拿取；
+- 或 `/give @s creativecontainer:creative_container`；
+- 整合包作者：在数据包 `data/<命名空间>/recipe/` 里为 `creativecontainer:creative_container` 写配方即可，本模组不占用、不冲突任何配方命名空间。
 
 ## 配置
 
@@ -71,10 +71,10 @@ N D N       E = 龙蛋
 ```bash
 export JAVA_HOME=/path/to/jdk-21
 ./gradlew build              # 产物在 build/libs/
-./gradlew runGameTestServer  # 无头机制测试（含 AE2 联动测试）
+./gradlew runGameTestServer  # 无头机制测试（34 项，含真实 AE2 ME 网络与真实 ProjectE EMC 联动）
 ./gradlew runClient          # 手动验收 GUI
 ```
 
 ## 许可
 
-LGPL-3.0（见 `LICENSE`）。
+LGPL-3.0（见 `LICENSE`）。其中拼音搜索能力来自 vendored 的 [PinIn](https://github.com/Towdium/PinIn) 1.6.0（MIT，作者 Towdium），源码与字典随本仓库 `pinyin/` 包分发并保留版权声明。
