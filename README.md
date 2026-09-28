@@ -75,6 +75,14 @@ export JAVA_HOME=/path/to/jdk-21
 ./gradlew runClient          # 手动验收 GUI
 ```
 
-## 许可
+## 许可与第三方库
 
-LGPL-3.0（见 `LICENSE`）。其中拼音搜索能力来自 vendored 的 [PinIn](https://github.com/Towdium/PinIn) 1.6.0（MIT，作者 Towdium），源码与字典随本仓库 `pinyin/` 包分发并保留版权声明。
+本项目以 **LGPL-3.0** 发布（见 `LICENSE`）。
+
+引用的第三方库：
+
+| 库 | 版本 | 许可 | 用途 | 分发方式 |
+| --- | --- | --- | --- | --- |
+| [PinIn](https://github.com/Towdium/PinIn) | 1.6.0 | MIT（Copyright (c) 2019 Juntong Liu） | 拼音搜索（全拼/首字母匹配） | **vendored**：源码与字典随本仓库 `pinyin/` 包分发（仅改包名，代码零改动），MIT 许可全文见 [`pinyin/LICENSE-PinIn.txt`](pinyin/LICENSE-PinIn.txt)，并随发布 jar 内 `META-INF/licenses/PinIn-LICENSE.txt` 一并分发 |
+
+按 MIT 要求，PinIn 的版权声明与许可文本随本模组的所有副本分发（仓库与发布 jar 均包含）；除此之外本模组**不打包、不声明任何其它第三方依赖**——NeoForge / Minecraft 为运行平台；AE2、ProjectE、Project Expansion 仅为运行时**可选联动**（未安装时本模组照常加载），不以任何形式随 jar 分发。

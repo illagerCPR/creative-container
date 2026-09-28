@@ -1,8 +1,8 @@
 /*
  * PinIn 1.6.0 - vendored copy.
- * Copyright (c) 2020-2023 Juntong Liu (Towdium), released under the MIT license.
+ * Copyright (c) 2019 Juntong Liu, released under the MIT license (see LICENSE-PinIn.txt).
  * Original project: https://github.com/Towdium/PinIn
- * Vendored into Creative Container on 2026-09-28; only the package was renamed
+ * Vendored into Creative Container on 2026-09-28 as PinIn 1.6.0; only the package was renamed
  * (me.towdium.pinin -> io.github.illagercpr.creativecontainer.pinyin), the code is untouched.
  */
 
@@ -37,4 +37,4 @@ public interface DictLoader {
             }
         }
     }
-}
+}
