@@ -12,8 +12,8 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 
 ## 环境陷阱（必读）
 
-- **WSL2 MTU 黑洞**：镜像网络模式下 eth MTU 1500 时超过 ~1400 字节的包被静默丢弃（大文件下载随机永久卡死）。本机已持久化修复（`/usr/local/sbin/wsl-fix-mtu.sh` 随 WSL 启动执行，所有 `eth*` MTU 1400）。Gradle 拉依赖卡住先查这个，不是反代。
-- **反代与 maven 无关**：`S302_rules.ini` 只覆盖 github 等域，不含任何 maven 域；Gradle 依赖卡死不是它。反代的真实危害是 MITM github 域名用自签证书 → **Java 报 `PKIX path building failed` 而 curl 正常**。需要 Java/Gradle 访问 github 的步骤前提醒用户关闭反代，完成后提醒重新打开。
+- **WSL2 MTU 黑洞**：镜像网络模式下 eth MTU 1500 时超过 ~1400 字节的包被静默丢弃（大文件下载随机永久卡死）。本机已持久化修复（`/usr/local/sbin/wsl-fix-mtu.sh` 随 WSL 启动执行，所有 `eth*` MTU 1400）。Gradle 拉依赖卡住先查这个。
+- **本地反代已停用删除**（2026-11-16 实测）：`S302_rules.ini` 与 SteamCommunity_302 已不存在，`/etc/hosts` 无 github 劫持，github.com 证书为官方 Sectigo、`Verify return code: 0 (ok)`。**旧的「反代 MITM github 域名导致 Java 报 `PKIX path building failed`」「需要 Java/Gradle 访问 github 前提醒用户关闭反代」纪律全部作废**，不要再据此行动。若将来重现 SSL 失败，按常规排查（MTU、DNS、证书过期）。
 - **系统无 `java` 命令**：JDK 21 在 `~/.gradle/jdks/jdk-21.0.12.1+1`，构建必须 `export JAVA_HOME=/home/illager_aris/.gradle/jdks/jdk-21.0.12.1+1`。Gradle 8.8 wrapper 发行版已缓存。
 - **WSLg 下 `runClient` 视角疯转**：解法是 `devmods/rdpmouse-neoforge-1.21.1-1.0.0.jar`（已在 `.gitignore`，经 `runtimeOnly files(...)` 接入，不进产物），游戏内 **F8** 切换 RDP 模式，光标触边按 **Alt** 回中。
 - **`cmd | tail` 的退出码是 tail 的**：长构建把真实退出码写进日志再判断（`... > log 2>&1; echo "EXIT=$?" >> log`）。
@@ -33,7 +33,7 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 - 物品 EMC 是 **`long`**（`EMCMappingHandler` 的 `Object2LongMap<ItemInfo>`，`@Range(0, Long.MAX_VALUE)`；自定义 EMC 文件用 `nonNegativeLong()`）。Project Expansion 的 **`SetEmcCMDMixin` 只改提示文案**，`SetEmcCMD` 参数仍是 `LongArgumentType.longArg(0, Long.MAX_VALUE)`；其 BigInteger 只用于 EMC 存储（`IEmcStorageBigInteger`）与玩家知识库。**结论：1.0×10²² 无法落地**，装 Project Expansion 时写 `Long.MAX_VALUE`。
 - 写入路径与 `/projecte setemc` 同源：`CustomEMCParser.init(registries)` → `addToFile(NSSItem, long)` → `flush(registries)`（`init` 内部会先 `flush` 再读文件，所以必须按这个顺序调）。
 - **EMC 计算时机（2026-09-27 实机验证纠错）**：EMC 在两条路径重算——① `PECore#addReloadListeners` 注册的**数据包加载阶段**监听器（专用服务器在线程启动前加载资源，这次计算**早于一切服务器事件**，`ServerAboutToStartEvent` 写入必然赶不上它）；② `PECore#dataPackSync` ← `OnDatapackSyncEvent`（`/reload` 及**每个玩家加入**）。所以生产环境首启后玩家一加入即生效；`ServerStartedEvent` 回读不一致时，本模组自行 post `OnDatapackSyncEvent(playerList, null)`（与 `/reload` 群发路径相同）触发重算实现自愈，无玩家场景也立即生效。
-- **dev 引入真实 ProjectE**：cursemaven（`maven { url 'https://cursemaven.com' }` + `runtimeOnly 'curse.maven:projecte-226410:6611984'`，1.21.1-PE1.1.0，**MIT**，依赖仅 minecraft+neoforge）。仅 dev 运行时，不编译、不打包。本机 **forgecdn 直连（mediafilez.forgecdn.net）不可达**（连接超时），必须走 cursemaven。ProjectE 的 UUID Checker/VersionChecker 遥测线程在本机会因反代 MITM 报 SSL 错误——自身已捕获，无害，grep 日志时排除。
+- **dev 引入真实 ProjectE**：cursemaven（`maven { url 'https://cursemaven.com' }` + `runtimeOnly 'curse.maven:projecte-226410:6611984'`，1.21.1-PE1.1.0，**MIT**，依赖仅 minecraft+neoforge）。仅 dev 运行时，不编译、不打包。本机 **forgecdn 直连（mediafilez.forgecdn.net）不可达**（2026-11-16 复测：请求 1.1s 返回 403，非超时但同样拿不到文件），必须走 cursemaven。ProjectE 的 UUID Checker/VersionChecker 遥测线程历史上曾因反代 MITM 报 SSL 错误（自身已捕获，无害）；**反代已于 2026-11-16 停用删除，该错误应不再出现**，若日志里仍有 SSL 报错按常规排查。
 - ProjectE 是 CurseForge 独占（无 Maven 制品、GitHub 无 release jar）→ 本模组对它的所有调用走**反射**，不引入编译期依赖。projecte modid = `projecte`，Project Expansion = `projectexpansion`。
 
 ### 核心池实现（勿凭旧印象改）
@@ -85,4 +85,4 @@ Minecraft **1.21.1 / NeoForge 21.1.248** 模组（modid `creativecontainer`）�
 - commit/tag 用全局 GPG 签名；推送必须用 GitHub 隐私邮箱 `63698328+illagerCPR@users.noreply.github.com`。
 - 验证分层：机制正确性进 GameTest，观感与手感靠 `runClient` 人工验收。
 - 不使用子代理（用户偏好）：调查与核对在本会话内自己完成。
-- 涉及计算机交互的任务完成后，询问用户是否把跨项目可复用经验存入 OpenViking 记忆。
+- 涉及计算机交互的任务完成后，按全局 `~/.dsh/AGENTS.md` 的记忆纪律处理（DSH 记忆插件自动触发反思，无需主动问询用户）。
